@@ -10,19 +10,19 @@ export default function ArchivePage() {
   // 💡 세 가지 포트폴리오의 실시간 구성 종목 상태 관리
   const [tabLists, setTabLists] = useState({
     aggressive: [
-      { code: '360750', weight: '65%' }, // ACE 미국나스닥100 변경 완료
+      { code: '360750', weight: '65%' }, // ACE 미국나스닥100
       { code: '0046Y0', weight: '25%' }, 
       { code: '280930', weight: '10%' }
     ],
     neutral: [
-      { code: '360200', weight: '30%' }, // ACE 미국S&P500 변경 완료
+      { code: '360200', weight: '30%' }, // ACE 미국S&P500
       { code: '0046Y0', weight: '20%' },
       { code: '488500', weight: '10%' },
       { code: '309230', weight: '10%' },
       { code: '280930', weight: '10%' }
     ],
     stable: [
-      { code: '360200', weight: '30%' }, // ACE 미국S&P500 변경 완료
+      { code: '360200', weight: '30%' }, // ACE 미국S&P500
       { code: '488500', weight: '10%' },
       { code: '452360', weight: '20%' },
       { code: '429000', weight: '10%' }
@@ -34,21 +34,18 @@ export default function ArchivePage() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
-    // 1. 브라우저 금고(localStorage) 복구 구문
     const savedTabLists = localStorage.getItem('kijay_tab_configurations');
     if (savedTabLists) { try { setTabLists(JSON.parse(savedTabLists)); } catch (e) {} }
 
     const savedQuantities = localStorage.getItem('kijay_etf_counts_v2');
     if (savedQuantities) { try { setQuantities(JSON.parse(savedQuantities)); } catch (e) {} }
 
-    // 2. 50대 풀 가격 동기화 수집
     fetch('/api/etfs')
       .then(res => res.json())
       .then(data => { if (!data.error) setMasterPool(data.pool || []); setIsLoading(false); })
       .catch(err => console.error(err));
   }, []);
 
-  // 목표 비중 텍스트 인라인 수정 처리기
   const handleWeightChange = (tab, code, textValue) => {
     const updatedTabList = tabLists[tab].map(item => item.code === code ? { ...item, weight: textValue } : item);
     const nextState = { ...tabLists, [tab]: updatedTabList };
@@ -56,7 +53,6 @@ export default function ArchivePage() {
     localStorage.setItem('kijay_tab_configurations', JSON.stringify(nextState));
   };
 
-  // 보유수량 변경 기입기
   const handleQtyChange = (code, val) => {
     const num = val === '' ? '' : Math.max(0, parseInt(val) || 0);
     const updated = { ...quantities, [code]: num };
@@ -64,7 +60,6 @@ export default function ArchivePage() {
     localStorage.setItem('kijay_etf_counts_v2', JSON.stringify(updated));
   };
 
-  // 💡 [요구사항 1] 검색 후 현재 활성화된 탭에 실시간 추가 
   const handleAddStockToTab = (code) => {
     if (activeTab === 'checker') return;
     const isExist = tabLists[activeTab].some(item => item.code === code);
@@ -78,7 +73,6 @@ export default function ArchivePage() {
     setIsDropdownOpen(false);
   };
 
-  // 현재 탭에서 종목 삭제 기폭장치
   const handleRemoveStockFromTab = (tab, code) => {
     const updatedTabList = tabLists[tab].filter(item => item.code !== code);
     const nextState = { ...tabLists, [tab]: updatedTabList };
@@ -86,25 +80,22 @@ export default function ArchivePage() {
     localStorage.setItem('kijay_tab_configurations', JSON.stringify(nextState));
   };
 
-  // 💡 [요구사항 3] 위/아래 순서 조정 화살표 조작 스왑 모듈
   const handleMoveOrder = (tab, index, direction) => {
     const currentList = [...tabLists[tab]];
     const targetIdx = direction === 'up' ? index - 1 : index + 1;
     if (targetIdx < 0 || targetIdx >= currentList.length) return;
 
-    // 자리 바꾸기 스왑 연산
     [currentList[index], currentList[targetIdx]] = [currentList[targetIdx], currentList[index]];
     const nextState = { ...tabLists, [tab]: currentList };
     setTabLists(nextState);
     localStorage.setItem('kijay_tab_configurations', JSON.stringify(nextState));
   };
 
-  // 🔍 실시간 인라인 필터 검색식 (50종 대상)
   const filteredSearchPool = masterPool.filter(item => 
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.code.includes(searchQuery)
   );
 
-  // 💡 [요구사항 2] 3개 탭에서 고유 코드를 실시간 추출하여 계산기 탭에 자동 합산 주입 (Union Sync)
+  // 💡 체커 탭에 3개 탭의 종목들을 중복 없이 모두 끌어옵니다.
   const activeCheckerCodes = Array.from(new Set([
     ...tabLists.aggressive.map(i => i.code),
     ...tabLists.neutral.map(i => i.code),
@@ -113,14 +104,13 @@ export default function ArchivePage() {
 
   const getRawPrice = (valStr) => parseFloat(valStr.replace(/[^0-9.-]/g, '')) || 0;
 
-  // X-RAY 매트릭스 계산기 상태 누적 보관함
   let totalPortfolioValue = 0;
   let sectorTotals = { tech: 0, finance: 0, health: 0, consumer_cyc: 0, ind: 0, communication: 0, consumer_def: 0, energy: 0, utilities: 0, basic: 0, realestate: 0 };
   let sizeTotals = { large: 0, mid: 0, small: 0 };
   let styleTotals = { value: 0, blend: 0, growth: 0 };
 
-  // 현재 활성화된 탭 종류에 따라 렌더링에 매핑할 리스트 배열 빌드
-  const mappedCurrentItems = (activeTab === 'checker' ? activeCheckerCodes.map(c => ({ code: c, weight: '' })) : tabLists[activeTab]).map(config => {
+  // 1차 매핑: 가격 및 평가 금액 계산
+  const baseItems = (activeTab === 'checker' ? activeCheckerCodes.map(c => ({ code: c, weight: '' })) : tabLists[activeTab]).map(config => {
     const foundData = masterPool.find(p => p.code === config.code);
     const qty = quantities[config.code] || 0;
     const price = foundData ? getRawPrice(foundData.value) : 0;
@@ -147,6 +137,24 @@ export default function ArchivePage() {
       xray: foundData ? foundData.xray : null
     };
   });
+
+  // 💡 2차 매핑: 계산 오류(Error)의 원인이었던 realWeight를 안전하게 주입
+  let finalMappedItems = baseItems.map(item => ({
+    ...item,
+    realWeight: totalPortfolioValue > 0 ? (item.evalValue / totalPortfolioValue) * 100 : 0
+  }));
+
+  // 체커 탭 활성화 시 지정된 순서대로 강제 정렬
+  if (activeTab === 'checker') {
+    const customOrder = ['360200', '360750', '449180', '449190', '452360', '446770', '0046Y0', '429000', '488500', '309230', '479420', '381180', '465580', '479490', '409820', '453650', '280930'];
+    finalMappedItems.sort((a, b) => {
+      let ia = customOrder.indexOf(a.code);
+      let ib = customOrder.indexOf(b.code);
+      if (ia === -1) ia = 999;
+      if (ib === -1) ib = 999;
+      return ia - ib;
+    });
+  }
 
   const getPercentage = (subValue) => totalPortfolioValue > 0 ? (subValue / totalPortfolioValue) * 100 : 0;
 
@@ -204,7 +212,6 @@ export default function ArchivePage() {
         </div>
 
         <section className="flex flex-col gap-6">
-          {/* 📊 보기 분기 1: 총 자산 상단 대시보드 요약 (체커 탭 활성화 시에만 출력) */}
           {activeTab === 'checker' && (
             <div className="bg-black text-white p-6 rounded-2xl shadow-md flex justify-between items-center">
               <div><p className="text-gray-400 text-xs font-bold tracking-wider">TOTAL PORTFOLIO ASSETS</p><p className="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">{totalPortfolioValue.toLocaleString('ko-KR')}<span className="text-sm font-normal text-gray-400 ml-1">원</span></p></div>
@@ -212,7 +219,6 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {/* 🔍 [요구사항 1] 상단 스마트 50종 마스터 풀 실시간 검색 상자 바인딩 (체커 탭이 아닐 때만 노출) */}
           {activeTab !== 'checker' && (
             <div className="relative bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
               <label className="block text-xs font-black text-gray-500 mb-1.5 tracking-wider">🔍 현재 포트폴리오 탭에 종목 편입 (미국 대표 ETF 50종 마스터 풀 검색)</label>
@@ -237,7 +243,6 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {/* 📊 동적 메인 테이블 영역 */}
           <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
             <div className="grid grid-cols-12 text-[10px] md:text-xs font-bold text-gray-400 border-b border-gray-100 pb-3 mb-3 px-2">
               <span className="col-span-5 md:col-span-6">ETF 종목정보</span>
@@ -248,47 +253,50 @@ export default function ArchivePage() {
             {isLoading ? (
               <div className="text-center py-12 text-gray-400 font-bold text-sm">마스터 데이터 파싱 엔진 동기화 중... ⏳</div>
             ) : (
-              <div className="flex flex-col gap-4">
-                {mappedCurrentItems.map((etf, index) => (
-                  <div key={index} className="grid grid-cols-12 items-center px-2 py-1 border-b border-gray-50 last:border-0 pb-3 last:pb-0 gap-2">
-                    {/* 종목 및 식별 정보 */}
+              <div className="flex flex-col gap-2">
+                {finalMappedItems.map((etf, index) => (
+                  // 💡 UI 칼각 정렬 완료 (py-3 및 flex-col justify-center 적용)
+                  <div key={index} className="grid grid-cols-12 items-center px-2 py-3 border-b border-gray-50 last:border-0 gap-2">
+                    
+                    {/* 왼쪽 섹션: 종목명 및 코드 */}
                     <div className="col-span-5 md:col-span-6 min-w-0 flex items-center gap-2">
                       {activeTab !== 'checker' && (
                         <button onClick={() => handleRemoveStockFromTab(activeTab, etf.code)} className="text-gray-300 hover:text-red-500 text-xs font-bold transition shrink-0 p-1">✕</button>
                       )}
-                      <div className="truncate">
-                        <p className="font-bold text-gray-900 text-sm md:text-base truncate leading-tight">{etf.name}</p>
-                        <p className="text-[10px] md:text-xs text-gray-400 font-medium mt-0.5">ETF {etf.code}</p>
+                      <div className="flex flex-col justify-center min-w-0">
+                        <p className="font-bold text-gray-900 text-sm md:text-base truncate leading-none mb-1.5">{etf.name}</p>
+                        <p className="text-[10px] md:text-xs text-gray-400 font-medium leading-none">ETF {etf.code}</p>
                       </div>
                     </div>
 
-                    {/* 중앙 가용 영역 (개수 입력 폼 VS 정렬 순서 및 목표 비중 설정 인풋) */}
-                    <div className="col-span-3 flex justify-center items-center gap-1.5">
+                    {/* 중앙 섹션: 수량 입력 또는 화살표/비중 */}
+                    <div className="col-span-3 flex justify-center items-center gap-1.5 h-full">
                       {activeTab === 'checker' ? (
                         <input type="number" min="0" placeholder="0" value={etf.qty === 0 ? '' : etf.qty} onChange={(e) => handleQtyChange(etf.code, e.target.value)} className="w-full max-w-[70px] md:max-w-[100px] text-center border border-gray-300 rounded-lg p-1 text-sm font-bold bg-gray-50 focus:bg-white focus:ring-2 focus:ring-black outline-none transition" />
                       ) : (
                         <div className="flex items-center gap-1">
-                          {/* 💡 [요구사항 3] 화살표 버튼 배치 */}
                           <div className="flex flex-col text-[10px] text-gray-400 font-bold shrink-0">
                             <button onClick={() => handleMoveOrder(activeTab, index, 'up')} disabled={index === 0} className="hover:text-black disabled:opacity-20 leading-none py-0.5">▲</button>
-                            <button onClick={() => handleMoveOrder(activeTab, index, 'down')} disabled={index === mappedCurrentItems.length - 1} className="hover:text-black disabled:opacity-20 leading-none py-0.5">▼</button>
+                            <button onClick={() => handleMoveOrder(activeTab, index, 'down')} disabled={index === finalMappedItems.length - 1} className="hover:text-black disabled:opacity-20 leading-none py-0.5">▼</button>
                           </div>
                           <input type="text" value={etf.targetWeight || '0%'} onChange={(e) => handleWeightChange(activeTab, etf.code, e.target.value)} className="w-12 md:w-14 border border-gray-200 rounded text-center text-xs font-bold bg-slate-50 text-blue-600 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none py-0.5" />
                         </div>
                       )}
                     </div>
 
-                    {/* 우측 가격 및 연산 지표 도출부 */}
-                    <div className="col-span-4 text-right flex flex-col justify-center">
+                    {/* 오른쪽 섹션: 가격, 평가금액, 비중, 등락률 */}
+                    <div className="col-span-4 flex flex-col items-end justify-center">
                       {activeTab === 'checker' ? (
                         <>
-                          <span className="text-sm md:text-base font-extrabold text-gray-900 tracking-tight">{etf.evalValue.toLocaleString('ko-KR')}<span className="text-[10px] md:text-xs font-normal text-gray-400 ml-0.5">원</span></span>
-                          <span className="text-xs font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded tracking-tighter mt-1 w-fit ml-auto">{etf.realWeight.toFixed(1)}%</span>
+                          <span className="text-sm md:text-base font-extrabold text-gray-900 tracking-tight leading-none mb-1.5">{etf.evalValue.toLocaleString('ko-KR')}<span className="text-[10px] md:text-xs font-normal text-gray-400 ml-0.5">원</span></span>
+                          <span className="text-xs font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded tracking-tighter leading-none">
+                            {etf.realWeight.toFixed(1)}%
+                          </span>
                         </>
                       ) : (
                         <>
-                          <span className="text-base md:text-lg font-extrabold text-gray-900 tracking-tight">{etf.value}<span className="text-xs md:text-sm font-normal text-gray-400 ml-0.5">원</span></span>
-                          <div className="flex items-center justify-end gap-0.5 mt-1 text-xs md:text-sm font-bold">
+                          <span className="text-sm md:text-base font-extrabold text-gray-900 tracking-tight leading-none mb-1.5">{etf.value}<span className="text-xs md:text-sm font-normal text-gray-400 ml-0.5">원</span></span>
+                          <div className="flex items-center gap-0.5 text-xs md:text-sm font-bold leading-none">
                             {etf.isUp === true && <svg className="w-3 h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
                             {etf.isUp === false && <svg className="w-3 h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
                             <span className={etf.isUp === true ? 'text-pink-600' : etf.isUp === false ? 'text-blue-500' : 'text-gray-500'}>{etf.change}</span>
@@ -302,7 +310,6 @@ export default function ArchivePage() {
             )}
           </div>
 
-          {/* 📊 보기 분기 2: 모닝스타 X-Ray 포트폴리오 가중평균 다각화 보고서 영역 */}
           {activeTab === 'checker' && totalPortfolioValue > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 transition-all duration-500">
               <div className="md:col-span-2"><RenderBarChart title="📊 실시간 구성 커스텀 포트폴리오 섹터별 비중 분석 (Sector Weight)" data={sectorsFinal} purple={true} /></div>
