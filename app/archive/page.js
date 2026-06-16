@@ -1,34 +1,20 @@
 "use client";
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+// 💡 [초대형 업데이트] recharts 도넛 차트 및 선형 그래프 모듈 임포트
+import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
 export default function ArchivePage() {
   const [activeTab, setActiveTab] = useState('myassets');
   const [masterPool, setMasterPool] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-
   const [cyclePhase, setCyclePhase] = useState('mid'); 
 
   const [tabLists, setTabLists] = useState({
     myassets: [],
-    aggressive: [
-      { code: '449190', weight: '65%' },
-      { code: '0046Y0', weight: '25%' }, 
-      { code: '280930', weight: '10%' }
-    ],
-    neutral: [
-      { code: '449180', weight: '30%' },
-      { code: '0046Y0', weight: '20%' },
-      { code: '488500', weight: '10%' },
-      { code: '309230', weight: '10%' },
-      { code: '280930', weight: '10%' }
-    ],
-    stable: [
-      { code: '449180', weight: '30%' },
-      { code: '488500', weight: '10%' },
-      { code: '452360', weight: '20%' },
-      { code: '429000', weight: '10%' }
-    ]
+    aggressive: [{ code: '449190', weight: '65%' }, { code: '0046Y0', weight: '25%' }, { code: '280930', weight: '10%' }],
+    neutral: [{ code: '449180', weight: '30%' }, { code: '0046Y0', weight: '20%' }, { code: '488500', weight: '10%' }, { code: '309230', weight: '10%' }, { code: '280930', weight: '10%' }],
+    stable: [{ code: '449180', weight: '30%' }, { code: '488500', weight: '10%' }, { code: '452360', weight: '20%' }, { code: '429000', weight: '10%' }]
   });
 
   const [quantities, setQuantities] = useState({});
@@ -38,7 +24,6 @@ export default function ArchivePage() {
   useEffect(() => {
     const savedTabLists = localStorage.getItem('kijay_tab_configurations');
     if (savedTabLists) { try { setTabLists(JSON.parse(savedTabLists)); } catch (e) {} }
-
     const savedQuantities = localStorage.getItem('kijay_etf_counts_v2');
     if (savedQuantities) { try { setQuantities(JSON.parse(savedQuantities)); } catch (e) {} }
 
@@ -63,7 +48,7 @@ export default function ArchivePage() {
   };
 
   const handleAddStockToTab = (code) => {
-    if (activeTab === 'checker' || activeTab === 'rebalance') return;
+    if (['checker', 'rebalance', 'dividend', 'backtest'].includes(activeTab)) return;
     const isExist = tabLists[activeTab].some(item => item.code === code);
     if (isExist) return;
 
@@ -75,7 +60,6 @@ export default function ArchivePage() {
     setIsDropdownOpen(false);
   };
 
-  // 💡 리밸런싱 탭에서 추천 ETF를 [내 자산]으로 바로 꽂아주는 특수 함수
   const handleAddStockToMyAssets = (code) => {
     const isExist = tabLists.myassets.some(item => item.code === code);
     if (!isExist) {
@@ -112,20 +96,19 @@ export default function ArchivePage() {
   );
 
   const activeCheckerCodes = Array.from(new Set([
-    ...tabLists.myassets.map(i => i.code),
-    ...tabLists.aggressive.map(i => i.code),
-    ...tabLists.neutral.map(i => i.code),
-    ...tabLists.stable.map(i => i.code)
+    ...tabLists.myassets.map(i => i.code), ...tabLists.aggressive.map(i => i.code),
+    ...tabLists.neutral.map(i => i.code), ...tabLists.stable.map(i => i.code)
   ]));
 
   const getRawPrice = (valStr) => parseFloat(valStr.replace(/[^0-9.-]/g, '')) || 0;
 
   let totalPortfolioValue = 0;
+  let totalAnnualDividend = 0; // 💡 연간 배당금 총합 연산 변수
   let sectorTotals = { tech: 0, finance: 0, health: 0, consumer_cyc: 0, ind: 0, communication: 0, consumer_def: 0, energy: 0, utilities: 0, basic: 0, realestate: 0 };
   let sizeTotals = { large: 0, mid: 0, small: 0 };
   let styleTotals = { value: 0, blend: 0, growth: 0 };
 
-  const isCalculationRequired = activeTab === 'checker' || activeTab === 'rebalance';
+  const isCalculationRequired = ['checker', 'rebalance', 'dividend', 'backtest'].includes(activeTab);
   const currentTargetCodes = isCalculationRequired ? activeCheckerCodes.map(c => ({ code: c, weight: '' })) : tabLists[activeTab];
 
   const baseItems = currentTargetCodes.map(config => {
@@ -137,6 +120,9 @@ export default function ArchivePage() {
     if (isCalculationRequired) {
       totalPortfolioValue += evalValue;
       if (foundData && foundData.xray) {
+        // 배당금 가중치 누적
+        if(foundData.xray.div) totalAnnualDividend += evalValue * (foundData.xray.div / 100);
+
         Object.keys(sectorTotals).forEach(k => { sectorTotals[k] += evalValue * ((foundData.xray.sectors?.[k] || 0) / 100); });
         Object.keys(sizeTotals).forEach(k => { sizeTotals[k] += evalValue * ((foundData.xray.sizes?.[k] || 0) / 100); });
         Object.keys(styleTotals).forEach(k => { styleTotals[k] += evalValue * ((foundData.xray.styles?.[k] || 0) / 100); });
@@ -157,114 +143,79 @@ export default function ArchivePage() {
   }));
 
   if (isCalculationRequired) {
-    const customOrder = [
-      '360200', '360750', '449180', '449190', 
-      '452360', '446770', '0046Y0', '429000', 
-      '488500', '309230', '479420', '381180', 
-      '465580', '479490', '409820', '453650', 
-      '280930'
-    ];
+    const customOrder = ['360200', '360750', '449180', '449190', '452360', '446770', '0046Y0', '429000', '488500', '309230', '479420', '381180', '465580', '479490', '409820', '453650', '280930'];
     finalMappedItems.sort((a, b) => {
-      let ia = customOrder.indexOf(a.code);
-      let ib = customOrder.indexOf(b.code);
-      if (ia === -1) ia = 999;
-      if (ib === -1) ib = 999;
+      let ia = customOrder.indexOf(a.code); let ib = customOrder.indexOf(b.code);
+      if (ia === -1) ia = 999; if (ib === -1) ib = 999;
       return ia - ib;
     });
   }
 
   const getPercentage = (subValue) => totalPortfolioValue > 0 ? (subValue / totalPortfolioValue) * 100 : 0;
 
-  const pTech = getPercentage(sectorTotals.tech);
-  const pFin = getPercentage(sectorTotals.finance);
-  const pHealth = getPercentage(sectorTotals.health);
-  const pInd = getPercentage(sectorTotals.ind);
-  const pCyc = getPercentage(sectorTotals.consumer_cyc);
-  const pComm = getPercentage(sectorTotals.communication);
-  const pDef = getPercentage(sectorTotals.consumer_def);
-  const pEnergy = getPercentage(sectorTotals.energy);
-  const pUtil = getPercentage(sectorTotals.utilities);
-  const pBasic = getPercentage(sectorTotals.basic);
+  // 💡 [기능 1] 도넛 차트 전용 데이터 및 색상 팔레트 세팅
+  const pieChartData = finalMappedItems.filter(item => item.realWeight > 0).map(item => ({ name: item.name, value: item.realWeight }));
+  const PIE_COLORS = ['#4f46e5', '#ec4899', '#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#64748b'];
+
+  // 💡 [기능 2] 배당 파이프라인 연산 (세전/세후 15.4%)
+  const avgDivYield = totalPortfolioValue > 0 ? (totalAnnualDividend / totalPortfolioValue) * 100 : 0;
+  const afterTaxAnnualDiv = totalAnnualDividend * (1 - 0.154);
+  const monthlyDiv = afterTaxAnnualDiv / 12;
+
+  // 💡 [기능 3] 5년 과거 수익률 시뮬레이션 백테스팅 곡선 데이터 연산
+  const weightedCagr1y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['1y'] || 0) * (item.realWeight / 100), 0);
+  const weightedCagr3y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['3y'] || 0) * (item.realWeight / 100), 0);
+  const weightedCagr5y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['5y'] || 0) * (item.realWeight / 100), 0);
+  
+  const backtestData = [];
+  if (totalPortfolioValue > 0) {
+    for (let year = 0; year <= 5; year++) {
+      backtestData.push({
+        year: `${year}년 후`,
+        "예상 자산(원)": Math.round(totalPortfolioValue * Math.pow(1 + weightedCagr5y / 100, year))
+      });
+    }
+  }
+
+  // 매크로 및 섹터 데이터 연산...
+  const pTech = getPercentage(sectorTotals.tech); const pFin = getPercentage(sectorTotals.finance);
+  const pHealth = getPercentage(sectorTotals.health); const pInd = getPercentage(sectorTotals.ind);
+  const pCyc = getPercentage(sectorTotals.consumer_cyc); const pComm = getPercentage(sectorTotals.communication);
+  const pDef = getPercentage(sectorTotals.consumer_def); const pEnergy = getPercentage(sectorTotals.energy);
+  const pUtil = getPercentage(sectorTotals.utilities); const pBasic = getPercentage(sectorTotals.basic);
   const pReal = getPercentage(sectorTotals.realestate);
 
-  // 💡 [요구사항] 용어 변경(초기/회복기, 후기/둔화기) 및 각 섹터별 고유 식별키(key) 부여
   const cycleDefinitions = {
     early: {
       title: "초기/회복기 국면 (Early-Cycle)",
-      recommend: [
-        { label: '순환소비재 (Cyclical)', key: 'consumer_cyc', current: pCyc, target: 15 },
-        { label: '금융서비스 (Finance)', key: 'finance', current: pFin, target: 15 },
-        { label: '정보기술 (Tech)', key: 'tech', current: pTech, target: 20 },
-        { label: '산업재 (Industrials)', key: 'ind', current: pInd, target: 15 }
-      ],
-      avoid: [
-        { label: '에너지 (Energy)', key: 'energy', current: pEnergy, target: 5 },
-        { label: '유틸리티 (Utilities)', key: 'utilities', current: pUtil, target: 5 }
-      ]
+      recommend: [{ label: '순환소비재 (Cyclical)', key: 'consumer_cyc', current: pCyc, target: 15 }, { label: '금융서비스 (Finance)', key: 'finance', current: pFin, target: 15 }, { label: '정보기술 (Tech)', key: 'tech', current: pTech, target: 20 }, { label: '산업재 (Industrials)', key: 'ind', current: pInd, target: 15 }],
+      avoid: [{ label: '에너지 (Energy)', key: 'energy', current: pEnergy, target: 5 }, { label: '유틸리티 (Utilities)', key: 'utilities', current: pUtil, target: 5 }]
     },
     mid: {
       title: "확장/중기 국면 (Mid-Cycle)",
-      recommend: [
-        { label: '정보기술 (Tech)', key: 'tech', current: pTech, target: 30 },
-        { label: '순환소비재 (Cyclical)', key: 'consumer_cyc', current: pCyc, target: 15 },
-        { label: '금융서비스 (Finance)', key: 'finance', current: pFin, target: 15 },
-        { label: '통신미디어 (Telecom)', key: 'communication', current: pComm, target: 10 }
-      ],
-      avoid: [
-        { label: '헬스케어 (Health)', key: 'health', current: pHealth, target: 5 },
-        { label: '필수소비재 (Defensive)', key: 'consumer_def', current: pDef, target: 5 },
-        { label: '유틸리티 (Utilities)', key: 'utilities', current: pUtil, target: 5 }
-      ]
+      recommend: [{ label: '정보기술 (Tech)', key: 'tech', current: pTech, target: 30 }, { label: '순환소비재 (Cyclical)', key: 'consumer_cyc', current: pCyc, target: 15 }, { label: '금융서비스 (Finance)', key: 'finance', current: pFin, target: 15 }, { label: '통신미디어 (Telecom)', key: 'communication', current: pComm, target: 10 }],
+      avoid: [{ label: '헬스케어 (Health)', key: 'health', current: pHealth, target: 5 }, { label: '필수소비재 (Defensive)', key: 'consumer_def', current: pDef, target: 5 }, { label: '유틸리티 (Utilities)', key: 'utilities', current: pUtil, target: 5 }]
     },
     late: {
       title: "후기/둔화기 국면 (Late-Cycle)",
-      recommend: [
-        { label: '기초소재 (Materials)', key: 'basic', current: pBasic, target: 15 },
-        { label: '헬스케어 (Health)', key: 'health', current: pHealth, target: 20 },
-        { label: '유틸리티 (Utilities)', key: 'utilities', current: pUtil, target: 15 }
-      ],
-      avoid: [
-        { label: '정보기술 (Tech)', key: 'tech', current: pTech, target: 10 },
-        { label: '순환소비재 (Cyclical)', key: 'consumer_cyc', current: pCyc, target: 5 }
-      ]
+      recommend: [{ label: '기초소재 (Materials)', key: 'basic', current: pBasic, target: 15 }, { label: '헬스케어 (Health)', key: 'health', current: pHealth, target: 20 }, { label: '유틸리티 (Utilities)', key: 'utilities', current: pUtil, target: 15 }],
+      avoid: [{ label: '정보기술 (Tech)', key: 'tech', current: pTech, target: 10 }, { label: '순환소비재 (Cyclical)', key: 'consumer_cyc', current: pCyc, target: 5 }]
     },
     recession: {
       title: "침체 국면 (Recession)",
-      recommend: [
-        { label: '필수소비재 (Defensive)', key: 'consumer_def', current: pDef, target: 25 },
-        { label: '헬스케어 (Health)', key: 'health', current: pHealth, target: 30 },
-        { label: '유틸리티 (Utilities)', key: 'utilities', current: pUtil, target: 20 }
-      ],
-      avoid: [
-        { label: '산업재 (Industrials)', key: 'ind', current: pInd, target: 5 },
-        { label: '기초소재 (Materials)', key: 'basic', current: pBasic, target: 5 },
-        { label: '정보기술 (Tech)', key: 'tech', current: pTech, target: 10 }
-      ]
+      recommend: [{ label: '필수소비재 (Defensive)', key: 'consumer_def', current: pDef, target: 25 }, { label: '헬스케어 (Health)', key: 'health', current: pHealth, target: 30 }, { label: '유틸리티 (Utilities)', key: 'utilities', current: pUtil, target: 20 }],
+      avoid: [{ label: '산업재 (Industrials)', key: 'ind', current: pInd, target: 5 }, { label: '기초소재 (Materials)', key: 'basic', current: pBasic, target: 5 }, { label: '정보기술 (Tech)', key: 'tech', current: pTech, target: 10 }]
     }
   };
-
   const currentCycleData = cycleDefinitions[cyclePhase];
 
   const sectorsFinal = [
-    { label: '정보기술 (Tech)', val: pTech }, { label: '금융서비스 (Finance)', val: pFin },
-    { label: '헬스케어 (Health)', val: pHealth }, { label: '산업재 (Industrials)', val: pInd },
-    { label: '순환소비재 (Cyclical)', val: pCyc }, { label: '통신미디어 (Telecom)', val: pComm },
-    { label: '필수소비재 (Defensive)', val: pDef }, { label: '에너지 (Energy)', val: pEnergy },
-    { label: '유틸리티 (Utilities)', val: pUtil }, { label: '기초소재 (Materials)', val: pBasic },
-    { label: '부동산 (Real Estate)', val: pReal }
+    { label: '정보기술 (Tech)', val: pTech }, { label: '금융서비스 (Finance)', val: pFin }, { label: '헬스케어 (Health)', val: pHealth }, { label: '산업재 (Industrials)', val: pInd },
+    { label: '순환소비재 (Cyclical)', val: pCyc }, { label: '통신미디어 (Telecom)', val: pComm }, { label: '필수소비재 (Defensive)', val: pDef }, { label: '에너지 (Energy)', val: pEnergy },
+    { label: '유틸리티 (Utilities)', val: pUtil }, { label: '기초소재 (Materials)', val: pBasic }, { label: '부동산 (Real Estate)', val: pReal }
   ];
-
-  const sizesFinal = [
-    { label: '대형주 (Large Cap)', val: getPercentage(sizeTotals.large) },
-    { label: '중형주 (Mid Cap)', val: getPercentage(sizeTotals.mid) },
-    { label: '소형주 (Small Cap)', val: getPercentage(sizeTotals.small) }
-  ];
-
-  const stylesFinal = [
-    { label: '가치 (Value)', val: getPercentage(styleTotals.value) },
-    { label: '혼합 (Blend)', val: getPercentage(styleTotals.blend) },
-    { label: '성장 (Growth)', val: getPercentage(styleTotals.growth) }
-  ];
+  const sizesFinal = [ { label: '대형주 (Large Cap)', val: getPercentage(sizeTotals.large) }, { label: '중형주 (Mid Cap)', val: getPercentage(sizeTotals.mid) }, { label: '소형주 (Small Cap)', val: getPercentage(sizeTotals.small) } ];
+  const stylesFinal = [ { label: '가치 (Value)', val: getPercentage(styleTotals.value) }, { label: '혼합 (Blend)', val: getPercentage(styleTotals.blend) }, { label: '성장 (Growth)', val: getPercentage(styleTotals.growth) } ];
 
   const RenderBarChart = ({ title, data, purple = true }) => (
     <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col gap-4">
@@ -283,31 +234,89 @@ export default function ArchivePage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
-      <header className="max-w-4xl mx-auto mb-8 flex justify-between items-center border-b border-gray-200 pb-6">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans pb-24">
+      <header className="max-w-5xl mx-auto mb-8 flex justify-between items-center border-b border-gray-200 pb-6">
         <div><p className="text-blue-600 font-bold text-xs md:text-sm tracking-wider">PORTFOLIO BUILDER Master</p><h1 className="text-xl md:text-3xl font-extrabold text-gray-900 mt-1">ETF 포트폴리오 빌더</h1></div>
         <Link href="/" className="bg-gray-200 text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm hover:bg-gray-300 transition shrink-0">← 메인으로</Link>
       </header>
 
-      <main className="max-w-4xl mx-auto">
-        <div className="flex gap-2 mb-6 bg-gray-200 p-1 rounded-xl w-fit flex-wrap">
-          <button onClick={() => setActiveTab('myassets')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'myassets' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💰 내 자산</button>
-          <button onClick={() => setActiveTab('aggressive')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'aggressive' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔥 공격형</button>
-          <button onClick={() => setActiveTab('neutral')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'neutral' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>⚖️ 중립형</button>
-          <button onClick={() => setActiveTab('stable')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'stable' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🛡️ 안정형</button>
-          <button onClick={() => setActiveTab('checker')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'checker' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📊 보유 비중</button>
-          <button onClick={() => setActiveTab('rebalance')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'rebalance' ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔄 리밸런싱</button>
+      <main className="max-w-5xl mx-auto">
+        {/* 💡 상단 메뉴바가 넘치지 않도록 깔끔하게 스크롤 및 래핑 처리 */}
+        <div className="flex gap-2 mb-6 bg-gray-200 p-1 rounded-xl w-full overflow-x-auto whitespace-nowrap hide-scrollbar">
+          <button onClick={() => setActiveTab('myassets')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'myassets' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💰 내 자산</button>
+          <button onClick={() => setActiveTab('aggressive')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'aggressive' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔥 공격형</button>
+          <button onClick={() => setActiveTab('neutral')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'neutral' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>⚖️ 중립형</button>
+          <button onClick={() => setActiveTab('stable')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'stable' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🛡️ 안정형</button>
+          <button onClick={() => setActiveTab('checker')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'checker' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📊 보유 비중</button>
+          <button onClick={() => setActiveTab('dividend')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'dividend' ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💸 배당/수익</button>
+          <button onClick={() => setActiveTab('backtest')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'backtest' ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📈 백테스팅</button>
+          <button onClick={() => setActiveTab('rebalance')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'rebalance' ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔄 리밸런싱</button>
         </div>
 
         <section className="flex flex-col gap-6">
-          {(activeTab === 'checker' || activeTab === 'rebalance') && (
+          {isCalculationRequired && (
             <div className="bg-black text-white p-6 rounded-2xl shadow-md flex justify-between items-center">
               <div><p className="text-gray-400 text-xs font-bold tracking-wider">TOTAL PORTFOLIO ASSETS</p><p className="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">{totalPortfolioValue.toLocaleString('ko-KR')}<span className="text-sm font-normal text-gray-400 ml-1">원</span></p></div>
-              <span className="bg-white/10 border border-white/20 px-3 py-1 rounded-full font-bold text-xs text-gray-300">실시간 연동</span>
+              <span className="bg-white/10 border border-white/20 px-3 py-1 rounded-full font-bold text-xs text-gray-300 shrink-0">실시간 연동</span>
             </div>
           )}
 
-          {activeTab !== 'checker' && activeTab !== 'rebalance' && (
+          {/* 💡 [기능 2] 배당 파이프라인 탭 렌더링 */}
+          {activeTab === 'dividend' && (
+            <div className="flex flex-col gap-6">
+              <div className="bg-gradient-to-r from-rose-50 to-pink-50 border border-pink-100 rounded-2xl p-6 shadow-sm">
+                <h2 className="text-xl font-black text-pink-900 mb-6 flex items-center gap-2">💸 나의 배당 파이프라인 현황</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-white p-5 rounded-xl shadow-sm border border-pink-50 flex flex-col justify-center items-center text-center">
+                    <p className="text-xs font-bold text-gray-400 mb-1">포트폴리오 가중 평균 배당률</p>
+                    <p className="text-3xl font-black text-pink-600">{avgDivYield.toFixed(2)}<span className="text-lg font-bold ml-1">%</span></p>
+                  </div>
+                  <div className="bg-white p-5 rounded-xl shadow-sm border border-pink-50 flex flex-col justify-center items-center text-center">
+                    <p className="text-xs font-bold text-gray-400 mb-1">예상 연간 배당금 (세전)</p>
+                    <p className="text-2xl font-black text-gray-800">{Math.round(totalAnnualDividend).toLocaleString('ko-KR')}<span className="text-base font-bold ml-1 text-gray-500">원</span></p>
+                  </div>
+                  <div className="bg-gradient-to-br from-pink-600 to-rose-600 p-5 rounded-xl shadow-md flex flex-col justify-center items-center text-center">
+                    <p className="text-xs font-bold text-pink-100 mb-1">예상 월평균 배당금 (세후 15.4% 적용)</p>
+                    <p className="text-3xl font-black text-white">{Math.round(monthlyDiv).toLocaleString('ko-KR')}<span className="text-lg font-bold ml-1 text-pink-200">원/월</span></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 💡 [기능 3] 백테스팅 탭 렌더링 */}
+          {activeTab === 'backtest' && (
+            <div className="flex flex-col gap-6">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-indigo-100 rounded-2xl p-6 shadow-sm">
+                <h2 className="text-xl font-black text-indigo-900 mb-2 flex items-center gap-2">📈 과거 수익률 기반 백테스팅 (5년 시뮬레이션)</h2>
+                <p className="text-xs text-gray-500 font-semibold mb-6">※ 현재 포트폴리오 비중을 유지했을 때의 과거 데이터를 기반으로 한 향후 5년 추정 자산 성장 곡선입니다.</p>
+                
+                <div className="grid grid-cols-3 gap-4 mb-8">
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">1년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr1y.toFixed(1)}%</p></div>
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">3년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr3y.toFixed(1)}%</p></div>
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">5년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr5y.toFixed(1)}%</p></div>
+                </div>
+
+                {totalPortfolioValue > 0 ? (
+                  <div className="h-[300px] w-full bg-white p-4 rounded-xl shadow-sm border border-indigo-50">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={backtestData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#64748b', fontWeight: 'bold' }} />
+                        <YAxis tickFormatter={(val) => (val/10000).toLocaleString() + '만'} tick={{ fontSize: 10, fill: '#64748b' }} width={60} />
+                        <RechartsTooltip formatter={(value) => value.toLocaleString('ko-KR') + '원'} labelStyle={{ fontWeight: 'bold', color: '#334155' }} />
+                        <Line type="monotone" dataKey="예상 자산(원)" stroke="#4f46e5" strokeWidth={4} dot={{ r: 4, fill: '#4f46e5' }} activeDot={{ r: 8 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="bg-white p-8 rounded-xl text-center text-gray-400 font-bold text-sm">자산을 먼저 입력하시면 시뮬레이션 차트가 생성됩니다.</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!['checker', 'rebalance', 'dividend', 'backtest'].includes(activeTab) && (
             <div className="relative bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
               <label className="block text-xs font-black text-gray-500 mb-1.5 tracking-wider">
                 {activeTab === 'myassets' ? '🔍 종목 담기 (미국 대표 ETF 50종)' : '🔍 현재 탭에 종목 편입 (미국 대표 ETF 50종)'}
@@ -335,11 +344,9 @@ export default function ArchivePage() {
 
           {activeTab === 'rebalance' && (
             <div className="flex flex-col gap-6">
-              
               <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                 <label className="block text-xs font-black text-slate-500 mb-3 tracking-wider">🗺️ CURRENT MACRO CYCLE STATE (현재 글로벌 경기 국면 선택)</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-100 p-1 rounded-xl">
-                  {/* 💡 [요구사항 1] 용어 직관화 업데이트 완료 */}
                   <button onClick={() => setCyclePhase('early')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'early' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>🌱 1. 초기/회복기</button>
                   <button onClick={() => setCyclePhase('mid')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'mid' ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>⚖️ 2. 확장/중기</button>
                   <button onClick={() => setCyclePhase('late')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'late' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>🍂 3. 후기/둔화기</button>
@@ -349,8 +356,7 @@ export default function ArchivePage() {
 
               {totalPortfolioValue === 0 ? (
                 <div className="bg-white rounded-2xl p-8 border border-gray-100 text-center font-bold text-gray-400 text-sm shadow-sm">
-                  [📊 보유 비중 체크] 탭에서 수량을 먼저 입력해 주셔야 <br/>
-                  <span className="text-xs text-teal-600 font-semibold mt-2 block">현재 내 자산 데이터를 분석하여 매크로 사이클 리밸런싱 종합 스튜디오 카드가 활성화됩니다!</span>
+                  [📊 보유 비중 체크] 탭에서 수량을 먼저 입력해 주셔야 매크로 스튜디오 카드가 활성화됩니다!
                 </div>
               ) : (
                 <div className="flex flex-col gap-6">
@@ -360,13 +366,11 @@ export default function ArchivePage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* 🟢 비중 확대 추천 (더 많이 채워야 할 섹터) */}
                     <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
                       <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
                         <h3 className="font-black text-gray-900 text-base flex items-center gap-1.5 text-emerald-600">🟢 비중 확대 추천 (Overweight)</h3>
                         <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded border border-emerald-200">매수 권장</span>
                       </div>
-                      
                       <div className="flex flex-col gap-3">
                         {currentCycleData.recommend.map((sec, idx) => {
                           const gap = sec.target - sec.current;
@@ -388,13 +392,11 @@ export default function ArchivePage() {
                       </div>
                     </div>
 
-                    {/* 🔴 비중 축소 권고 (덜어내거나 피해야 할 섹터) */}
                     <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
                       <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
                         <h3 className="font-black text-gray-900 text-base flex items-center gap-1.5 text-red-500">🔴 비중 축소 권고 (Underweight)</h3>
                         <span className="text-[10px] bg-red-50 text-red-700 font-bold px-2 py-0.5 rounded border border-red-200">매도 권장</span>
                       </div>
-
                       <div className="flex flex-col gap-3">
                         {currentCycleData.avoid.map((sec, idx) => {
                           const excess = sec.current - sec.target;
@@ -417,27 +419,21 @@ export default function ArchivePage() {
                     </div>
                   </div>
 
-                  {/* 💡 [NEW 요구사항 3] 부족한 섹터를 채우기 위한 50대 마스터 풀 기반 ETF 자동 추천 엔진 */}
                   {currentCycleData.recommend.some(sec => sec.target - sec.current > 0) && (
                     <div className="bg-indigo-50 rounded-2xl p-4 md:p-6 shadow-sm border border-indigo-100 mt-2">
                       <div className="flex justify-between items-center border-b border-indigo-200 pb-3 mb-4">
                         <h3 className="font-black text-indigo-900 text-base flex items-center gap-1.5">🤖 AI 맞춤형 ETF 매수 추천</h3>
                         <span className="text-[10px] bg-indigo-600 text-white font-bold px-2 py-0.5 rounded">마스터 풀 스캔 완료</span>
                       </div>
-                      
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {currentCycleData.recommend.filter(sec => sec.target - sec.current > 0).map((sec, idx) => {
-                          // 백엔드 풀에서 해당 섹터 비중이 가장 높은 상위 2개 ETF를 자동으로 찾아냅니다!
                           const recommendedETFs = masterPool
                             .filter(etf => etf.xray && etf.xray.sectors[sec.key] > 0)
                             .sort((a, b) => b.xray.sectors[sec.key] - a.xray.sectors[sec.key])
                             .slice(0, 2);
-
                           return (
                             <div key={idx} className="bg-white border border-indigo-100 rounded-xl p-4 shadow-sm">
-                              <p className="text-xs font-black text-indigo-500 mb-3 border-b border-indigo-50 pb-2">
-                                [{sec.label}] 비중 확대를 위한 최적의 종목
-                              </p>
+                              <p className="text-xs font-black text-indigo-500 mb-3 border-b border-indigo-50 pb-2">[{sec.label}] 비중 확대를 위한 최적의 종목</p>
                               <div className="flex flex-col gap-2">
                                 {recommendedETFs.length > 0 ? recommendedETFs.map((etf, i) => (
                                   <div key={i} className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100">
@@ -445,16 +441,9 @@ export default function ArchivePage() {
                                       <p className="text-sm font-bold text-gray-800 truncate">{etf.name}</p>
                                       <p className="text-[10px] text-gray-500 mt-0.5 font-semibold">내부 섹터 비중: <span className="text-indigo-600 font-black">{etf.xray.sectors[sec.key]}%</span></p>
                                     </div>
-                                    <button 
-                                      onClick={() => handleAddStockToMyAssets(etf.code)}
-                                      className="shrink-0 text-xs font-bold text-white bg-indigo-500 px-3 py-1.5 rounded-md hover:bg-indigo-600 transition shadow-sm"
-                                    >
-                                      + 내 자산에 담기
-                                    </button>
+                                    <button onClick={() => handleAddStockToMyAssets(etf.code)} className="shrink-0 text-xs font-bold text-white bg-indigo-500 px-3 py-1.5 rounded-md hover:bg-indigo-600 transition shadow-sm">+ 내 자산에 담기</button>
                                   </div>
-                                )) : (
-                                  <p className="text-xs text-gray-400">현재 풀에 추천할 만한 특화 ETF가 없습니다.</p>
-                                )}
+                                )) : (<p className="text-xs text-gray-400">현재 풀에 추천할 만한 특화 ETF가 없습니다.</p>)}
                               </div>
                             </div>
                           );
@@ -462,13 +451,12 @@ export default function ArchivePage() {
                       </div>
                     </div>
                   )}
-
                 </div>
               )}
             </div>
           )}
 
-          {activeTab !== 'rebalance' && (
+          {!['dividend', 'backtest', 'rebalance'].includes(activeTab) && (
             <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
               <div className="grid grid-cols-12 text-[10px] md:text-xs font-bold text-gray-400 border-b border-gray-100 pb-3 mb-3 px-2">
                 <span className="col-span-5">ETF 종목정보</span>
@@ -487,7 +475,6 @@ export default function ArchivePage() {
                   ) : (
                     finalMappedItems.map((etf, index) => (
                       <div key={index} className="grid grid-cols-12 items-center px-2 py-2 border-b border-gray-50 last:border-0 gap-2">
-                        
                         <div className="col-span-5 min-w-0 flex items-center gap-2">
                           {activeTab !== 'checker' && (
                             <button onClick={() => handleRemoveStockFromTab(activeTab, etf.code)} className="text-gray-300 hover:text-red-500 text-xs font-bold transition shrink-0 p-1">✕</button>
@@ -541,6 +528,24 @@ export default function ArchivePage() {
 
           {activeTab === 'checker' && totalPortfolioValue > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 transition-all duration-500">
+              
+              {/* 💡 [기능 1] 보유 비중 탭 최상단에 예쁜 원형 도넛(Pie) 차트 추가 완료! */}
+              <div className="md:col-span-2 bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
+                <h3 className="font-extrabold text-gray-900 text-sm md:text-base border-b border-gray-50 pb-2 mb-4">🍩 내 포트폴리오 종목 비중 (Donut Chart)</h3>
+                <div className="h-[250px] md:h-[350px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={pieChartData} cx="50%" cy="50%" innerRadius="55%" outerRadius="80%" paddingAngle={5} dataKey="value" stroke="none" label={({ name, percent }) => `${name.replace(/미국|KODEX|TIGER|ACE|SOL|KBSTAR|PLUS|HANARO|\(H\)|합성/g, '').trim()} ${(percent * 100).toFixed(1)}%`} labelLine={false} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#475569' }}>
+                        {pieChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip formatter={(value) => value.toFixed(1) + '%'} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
               <div className="md:col-span-2"><RenderBarChart title="📊 실시간 구성 커스텀 포트폴리오 섹터별 비중 분석 (Sector Weight)" data={sectorsFinal} purple={true} /></div>
               <RenderBarChart title="📈 기업 규모별 분산 비중 (Market Cap Size)" data={sizesFinal} purple={false} />
               <RenderBarChart title="💎 주식 투자 스타일 분산 지표 (Investment Style)" data={stylesFinal} purple={true} />
