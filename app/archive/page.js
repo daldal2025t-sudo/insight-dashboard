@@ -136,7 +136,6 @@ export default function ArchivePage() {
   }));
 
   if (activeTab === 'checker') {
-    // 💡 에러 방지: 잘림 현상이 없도록 여러 줄로 분할 선언
     const customOrder = [
       '360200', '360750', '449180', '449190', 
       '452360', '446770', '0046Y0', '429000', 
@@ -240,8 +239,9 @@ export default function ArchivePage() {
           )}
 
           <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
+            {/* 💡 헤더 그리드 총 12칸 (5+3+4) 맞춤 완료 */}
             <div className="grid grid-cols-12 text-[10px] md:text-xs font-bold text-gray-400 border-b border-gray-100 pb-3 mb-3 px-2">
-              <span className="col-span-5 md:col-span-6">ETF 종목정보</span>
+              <span className="col-span-5">ETF 종목정보</span>
               <span className="col-span-3 text-center">{activeTab === 'checker' ? '보유개수' : '목표비중 / 순서'}</span>
               <span className="col-span-4 text-right">{activeTab === 'checker' ? '실시간 평가액 / 비중' : '현재가 / 등락률'}</span>
             </div>
@@ -253,7 +253,8 @@ export default function ArchivePage() {
                 {finalMappedItems.map((etf, index) => (
                   <div key={index} className="grid grid-cols-12 items-center px-2 py-2 border-b border-gray-50 last:border-0 gap-2">
                     
-                    <div className="col-span-5 md:col-span-6 min-w-0 flex items-center gap-2">
+                    {/* 💡 바디 1열 그리드 5칸 (col-span-5) 고정 완료 */}
+                    <div className="col-span-5 min-w-0 flex items-center gap-2">
                       {activeTab !== 'checker' && (
                         <button onClick={() => handleRemoveStockFromTab(activeTab, etf.code)} className="text-gray-300 hover:text-red-500 text-xs font-bold transition shrink-0 p-1">✕</button>
                       )}
