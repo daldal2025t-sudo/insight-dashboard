@@ -2,9 +2,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-// ==========================================
-// 1. 뉴스 카드 컴포넌트
-// ==========================================
 function NewsCard({ category }) {
   const [news, setNews] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -12,10 +9,7 @@ function NewsCard({ category }) {
   useEffect(() => {
     fetch(`/api/news?query=${category}`)
       .then((res) => res.json())
-      .then((data) => {
-        setNews(data);
-        setIsLoading(false);
-      })
+      .then((data) => { setNews(data); setIsLoading(false); })
       .catch((err) => console.error(err));
   }, [category]);
 
@@ -29,9 +23,6 @@ function NewsCard({ category }) {
     );
   }
 
-  const mainArticle = news[0];
-  const subArticles = news.slice(1, 10); 
-
   return (
     <article className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition flex flex-col justify-between">
       <div>
@@ -39,14 +30,14 @@ function NewsCard({ category }) {
           <h3 className="text-xl font-bold text-gray-900">{category}</h3>
           <span className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-md">{news.length} articles</span>
         </div>
-        {mainArticle && (
-          <a href={mainArticle.link} target="_blank" rel="noreferrer" className="block mb-4 pb-4 border-b border-gray-100 group">
+        {news[0] && (
+          <a href={news[0].link} target="_blank" rel="noreferrer" className="block mb-4 pb-4 border-b border-gray-100 group">
             <p className="text-red-500 text-sm font-bold mb-1">🔥 주요 기사</p>
-            <p className="font-bold text-gray-800 line-clamp-2 group-hover:text-blue-600 transition">{cleanTitle(mainArticle.title)}</p>
+            <p className="font-bold text-gray-800 line-clamp-2 group-hover:text-blue-600 transition">{cleanTitle(news[0].title)}</p>
           </a>
         )}
         <ul className="flex flex-col gap-3">
-          {subArticles.map((article, index) => (
+          {news.slice(1, 10).map((article, index) => (
             <li key={index} className="flex gap-3 items-start group">
               <span className="text-blue-500 font-bold text-sm shrink-0">{index + 1 < 10 ? `0${index + 1}` : index + 1}</span>
               <a href={article.link} target="_blank" rel="noreferrer" className="text-gray-600 text-sm line-clamp-2 group-hover:text-gray-900 transition">{cleanTitle(article.title)}</a>
@@ -58,54 +49,23 @@ function NewsCard({ category }) {
   );
 }
 
-// ==========================================
-// 2. 듀얼 모니터링 탑재 지표 전광판
-// ==========================================
 function StockTicker() {
   const [liveData, setLiveData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
 
   const fetchStocks = () => {
     setIsLoading(true);
-    setIsError(false);
-    
     fetch('/api/stocks')
       .then(res => res.json())
-      .then(data => {
-        if (data.error) throw new Error(data.error);
-        setLiveData(data);
-        setIsLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setIsError(true);
-        setIsLoading(false);
-      });
+      .then(data => { setLiveData(data); setIsLoading(false); })
+      .catch(err => { console.error(err); setIsLoading(false); });
   };
 
-  useEffect(() => {
-    fetchStocks();
-  }, []);
+  useEffect(() => { fetchStocks(); }, []);
 
-  const defaultStocks = [
-    { name: 'S&P 500', value: '-', change: '-', isUp: null },
-    { name: 'NASDAQ', value: '-', change: '-', isUp: null },
-    { name: 'DOW', value: '-', change: '-', isUp: null },
-    { name: 'Russell 2000', value: '-', change: '-', isUp: null },
-    { name: 'KOSPI', value: '-', change: '-', isUp: null },
-    { name: 'KOSDAQ', value: '-', change: '-', isUp: null },
-  ];
+  const defaultStocks = Array(6).fill({ name: '-', value: '-', change: '-', isUp: null });
+  const defaultMacros = Array(5).fill({ name: '-', value: '-', change: '-', isUp: null });
 
-  const defaultMacros = [
-    { name: '원/달러 환율', value: '-', change: '-', isUp: null, suffix: '원' },
-    { name: '미국 10년물 국채금리', value: '-', change: '-', isUp: null, suffix: '%' },
-    { name: 'VIX 공포지수', value: '-', change: '-', isUp: null, suffix: '' },
-    { name: '국제 금 선물', value: '-', change: '-', isUp: null, suffix: '달러' },
-    { name: '비트코인', value: '-', change: '-', isUp: null, suffix: ' 원' }
-  ];
-
-  // 💡 총 지표가 11개로 늘어났으므로 분기 오프셋을 6번 기준으로 깔끔하게 나눕니다.
   const line1Stocks = liveData && liveData.length >= 6 ? liveData.slice(0, 6) : defaultStocks;
   const line2Macros = liveData && liveData.length >= 6 ? liveData.slice(6) : defaultMacros;
 
@@ -116,25 +76,18 @@ function StockTicker() {
         <span className="text-lg md:text-xl font-extrabold tracking-tighter text-gray-900 leading-none">
           {item.value}<span className="text-xs md:text-sm font-normal ml-1 text-gray-500">{item.suffix || ''}</span>
         </span>
-        
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center gap-1 leading-none">
             {item.isUp === true && <svg className="w-4 h-4 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
             {item.isUp === false && <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
-            {item.isUp === null && <span className="text-gray-400 text-sm font-bold">-</span>}
-            <span className={`text-sm font-semibold ${item.isUp === true ? 'text-pink-600' : item.isUp === false ? 'text-blue-500' : 'text-gray-500'}`}>
-              {item.change}
-            </span>
+            <span className={`text-sm font-semibold ${item.isUp === true ? 'text-pink-600' : item.isUp === false ? 'text-blue-500' : 'text-gray-500'}`}>{item.change}</span>
           </div>
-
           {item.spotChange && (
             <div className="flex items-center gap-1 leading-none mt-1">
               <span className="text-[10px] bg-gray-300 text-gray-600 px-1 rounded font-bold tracking-tighter">현물</span>
               {item.isSpotUp === true && <svg className="w-3 h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
               {item.isSpotUp === false && <svg className="w-3 h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
-              <span className={`text-xs font-semibold ${item.isSpotUp === true ? 'text-pink-600' : item.isSpotUp === false ? 'text-blue-500' : 'text-gray-500'}`}>
-                {item.spotChange}
-              </span>
+              <span className={`text-xs font-semibold ${item.isSpotUp === true ? 'text-pink-600' : item.isSpotUp === false ? 'text-blue-500' : 'text-gray-500'}`}>{item.spotChange}</span>
             </div>
           )}
         </div>
@@ -148,24 +101,16 @@ function StockTicker() {
       <div>
         <div className="bg-gray-500 text-white px-4 py-2 flex justify-between items-center">
           <h2 className="text-lg font-bold tracking-tight">글로벌 핵심 증시 (실시간)</h2>
-          <button 
-            onClick={fetchStocks} 
-            disabled={isLoading}
-            className="text-xs bg-gray-600 hover:bg-gray-700 px-3 py-1.5 rounded-md transition disabled:opacity-50 flex items-center gap-1"
-          >
-            {isLoading ? '⏳ 수집중...' : '↻ 다시 로딩'}
-          </button>
+          <button onClick={fetchStocks} className="text-xs bg-gray-600 hover:bg-gray-700 px-3 py-1.5 rounded-md transition flex items-center gap-1">↻ 다시 로딩</button>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-6">
-          {line1Stocks.map((stock, index) => renderItem(stock, index))}
-        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-6">{line1Stocks.map((stock, index) => renderItem(stock, index))}</div>
       </div>
       <div>
         <div className="bg-slate-700 text-white px-4 py-2 flex justify-between items-center">
           <h2 className="text-lg font-bold tracking-tight">외환 및 주요 거시경제 지표 (실시간)</h2>
         </div>
-        {/* 💡 그리드 비율을 5종에 최적화하여 깔끔하게 분할 정렬했습니다. */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5">
+        {/* 💡 모바일 화면에서 1줄(grid-cols-1)로 나오던 것을 2줄(grid-cols-2)로 교정 완료 */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
           {line2Macros.map((macro, index) => renderItem(macro, index))}
         </div>
       </div>
@@ -173,9 +118,6 @@ function StockTicker() {
   );
 }
 
-// ==========================================
-// 3. 전체 메인 화면
-// ==========================================
 export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
@@ -185,66 +127,21 @@ export default function Home() {
           <h1 className="text-2xl md:text-4xl font-extrabold text-gray-900 mt-1 mb-2">KIJAY Daily Insight</h1>
           <p className="text-gray-500 text-xs md:text-sm">실시간 경제 및 글로벌 자산 시장의 핵심 지표를 트래킹하는 금융 대시보드입니다.</p>
         </div>
-        <Link href="/archive" className="bg-black text-white px-4 py-2 md:px-5 md:py-2 rounded-full font-bold text-xs md:text-sm hover:bg-gray-800 transition shrink-0">
-          아카이브 보기
-        </Link>
+        <Link href="/archive" className="bg-black text-white px-4 py-2 md:px-5 md:py-2 rounded-full font-bold text-xs md:text-sm hover:bg-gray-800 transition shrink-0">아카이브 보기</Link>
       </header>
-
       <main className="max-w-7xl mx-auto">
         <StockTicker />
-
         <section className="bg-black text-white rounded-2xl p-6 shadow-lg mb-12">
           <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-            <li className="flex gap-4 items-center border-b border-gray-900 pb-3 md:pb-4">
-              <span className="text-red-400 font-bold text-xs whitespace-nowrap bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">
-                Global
-              </span>
-              <a href="https://www.hankyung.com/globalmarket/global-equity-market" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">
-                한경 글로벌마켓 <span className="text-gray-500 text-xs md:text-sm font-normal hidden sm:inline">해외증시 ↗</span>
-              </a>
-            </li>
-
-            <li className="flex gap-4 items-center border-b border-gray-900 pb-3 md:pb-4">
-              <span className="text-amber-400 font-bold text-xs whitespace-nowrap bg-amber-950/50 px-2 py-0.5 rounded border border-amber-900 min-w-[56px] text-center">
-                Cycle
-              </span>
-              <a href="https://institutional.fidelity.com/app/item/RD_13569_40890.html" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">
-                경기사이클 <span className="text-gray-500 text-xs md:text-sm font-normal hidden sm:inline">피델리티 리서치 ↗</span>
-              </a>
-            </li>
-
-            <li className="flex gap-4 items-center border-b md:border-b-0 border-gray-900 pb-3 md:pb-0 pt-1">
-              <span className="text-blue-400 font-bold text-xs whitespace-nowrap bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900 min-w-[56px] text-center">
-                Korea
-              </span>
-              <a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">
-                한경 코리안마켓 <span className="text-gray-500 text-xs md:text-sm font-normal hidden sm:inline">국내증시 ↗</span>
-              </a>
-            </li>
-
-            <li className="flex gap-4 items-center pt-1">
-              <span className="text-emerald-400 font-bold text-xs whitespace-nowrap bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900 min-w-[56px] text-center">
-                FED
-              </span>
-              <a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">
-                FED 점도표 <span className="text-gray-500 text-xs md:text-sm font-normal hidden sm:inline">연준 FOMC 일정 ↗</span>
-              </a>
-            </li>
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3 md:pb-4"><span className="text-red-400 font-bold text-xs bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">Global</span><a href="https://www.hankyung.com/globalmarket/global-equity-market" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 글로벌마켓</a></li>
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3 md:pb-4"><span className="text-amber-400 font-bold text-xs bg-amber-950/50 px-2 py-0.5 rounded border border-amber-900 min-w-[56px] text-center">Cycle</span><a href="https://institutional.fidelity.com/app/item/RD_13569_40890.html" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">경기사이클</a></li>
+            <li className="flex gap-4 items-center border-b md:border-b-0 border-gray-900 pb-3 md:pb-0 pt-1"><span className="text-blue-400 font-bold text-xs bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900 min-w-[56px] text-center">Korea</span><a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 코리안마켓</a></li>
+            <li className="flex gap-4 items-center pt-1"><span className="text-emerald-400 font-bold text-xs bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900 min-w-[56px] text-center">FED</span><a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">FED 점도표</a></li>
           </ul>
         </section>
-
-        <div className="mt-12 mb-6">
-          <p className="text-gray-500 text-sm font-bold tracking-wider">TODAY BRIEFING</p>
-          <h2 className="text-2xl font-extrabold text-gray-900 mt-1">오늘의 주요 뉴스 헤드라인</h2>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <NewsCard category="해외증시" />
-          <NewsCard category="국제" />
-          <NewsCard category="기업" />
-          <NewsCard category="부동산" />
-          <NewsCard category="경제" />
-          <NewsCard category="금융" />
+          <NewsCard category="해외증시" /><NewsCard category="국제" /><NewsCard category="기업" />
+          <NewsCard category="부동산" /><NewsCard category="경제" /><NewsCard category="금융" />
         </div>
       </main>
     </div>
