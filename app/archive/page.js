@@ -7,8 +7,6 @@ export default function ArchivePage() {
   const [masterPool, setMasterPool] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 💡 [NEW 요구사항] 현재 경기 사이클 단계를 직접 선택할 수 있는 상태 커널 추가
-  // 기본값은 'mid'(확장/중기)로 설정, 유저가 화면에서 변경 가능
   const [cyclePhase, setCyclePhase] = useState('mid'); 
 
   const [tabLists, setTabLists] = useState({
@@ -75,6 +73,20 @@ export default function ArchivePage() {
     localStorage.setItem('kijay_tab_configurations', JSON.stringify(nextState));
     setSearchQuery('');
     setIsDropdownOpen(false);
+  };
+
+  // 💡 리밸런싱 탭에서 추천 ETF를 [내 자산]으로 바로 꽂아주는 특수 함수
+  const handleAddStockToMyAssets = (code) => {
+    const isExist = tabLists.myassets.some(item => item.code === code);
+    if (!isExist) {
+      const updatedTabList = [...tabLists.myassets, { code, weight: '0%' }];
+      const nextState = { ...tabLists, myassets: updatedTabList };
+      setTabLists(nextState);
+      localStorage.setItem('kijay_tab_configurations', JSON.stringify(nextState));
+      alert('✅ 성공적으로 [💰 내 자산] 탭에 편입되었습니다!');
+    } else {
+      alert('⚠️ 이미 내 자산에 편입된 종목입니다.');
+    }
   };
 
   const handleRemoveStockFromTab = (tab, code) => {
@@ -163,7 +175,6 @@ export default function ArchivePage() {
 
   const getPercentage = (subValue) => totalPortfolioValue > 0 ? (subValue / totalPortfolioValue) * 100 : 0;
 
-  // 11대 섹터별 개별 백분율 비중 실시간 산출
   const pTech = getPercentage(sectorTotals.tech);
   const pFin = getPercentage(sectorTotals.finance);
   const pHealth = getPercentage(sectorTotals.health);
@@ -176,60 +187,59 @@ export default function ArchivePage() {
   const pBasic = getPercentage(sectorTotals.basic);
   const pReal = getPercentage(sectorTotals.realestate);
 
-  // 💡 [핵심 엔진 복합 매핑] 피델리티 경기 사이클 4단계별 타겟 섹터 그룹 정의
+  // 💡 [요구사항] 용어 변경(초기/회복기, 후기/둔화기) 및 각 섹터별 고유 식별키(key) 부여
   const cycleDefinitions = {
     early: {
-      title: "초기 국면 (Early-Cycle)",
+      title: "초기/회복기 국면 (Early-Cycle)",
       recommend: [
-        { label: '부동산 (Real Estate)', current: pReal, target: 10 },
-        { label: '순환소비재 (Cyclical)', current: pCyc, target: 15 },
-        { label: '금융서비스 (Finance)', current: pFin, target: 15 },
-        { label: '정보기술 (Tech)', current: pTech, target: 20 },
-        { label: '산업재 (Industrials)', current: pInd, target: 15 }
+        { label: '순환소비재 (Cyclical)', key: 'consumer_cyc', current: pCyc, target: 15 },
+        { label: '금융서비스 (Finance)', key: 'finance', current: pFin, target: 15 },
+        { label: '정보기술 (Tech)', key: 'tech', current: pTech, target: 20 },
+        { label: '산업재 (Industrials)', key: 'ind', current: pInd, target: 15 }
       ],
       avoid: [
-        { label: '에너지 (Energy)', current: pEnergy, target: 5 },
-        { label: '유틸리티 (Utilities)', current: pUtil, target: 5 }
+        { label: '에너지 (Energy)', key: 'energy', current: pEnergy, target: 5 },
+        { label: '유틸리티 (Utilities)', key: 'utilities', current: pUtil, target: 5 }
       ]
     },
     mid: {
       title: "확장/중기 국면 (Mid-Cycle)",
       recommend: [
-        { label: '정보기술 (Tech)', current: pTech, target: 30 },
-        { label: '순환소비재 (Cyclical)', current: pCyc, target: 15 },
-        { label: '금융서비스 (Finance)', current: pFin, target: 15 },
-        { label: '통신미디어 (Telecom)', current: pComm, target: 10 }
+        { label: '정보기술 (Tech)', key: 'tech', current: pTech, target: 30 },
+        { label: '순환소비재 (Cyclical)', key: 'consumer_cyc', current: pCyc, target: 15 },
+        { label: '금융서비스 (Finance)', key: 'finance', current: pFin, target: 15 },
+        { label: '통신미디어 (Telecom)', key: 'communication', current: pComm, target: 10 }
       ],
       avoid: [
-        { label: '헬스케어 (Health)', current: pHealth, target: 5 },
-        { label: '필수소비재 (Defensive)', current: pDef, target: 5 },
-        { label: '유틸리티 (Utilities)', current: pUtil, target: 5 }
+        { label: '헬스케어 (Health)', key: 'health', current: pHealth, target: 5 },
+        { label: '필수소비재 (Defensive)', key: 'consumer_def', current: pDef, target: 5 },
+        { label: '유틸리티 (Utilities)', key: 'utilities', current: pUtil, target: 5 }
       ]
     },
     late: {
-      title: "후기 국면 (Late-Cycle)",
+      title: "후기/둔화기 국면 (Late-Cycle)",
       recommend: [
-        { label: '에너지 (Energy)', current: pEnergy, target: 15 },
-        { label: '기초소재 (Materials)', current: pBasic, target: 15 },
-        { label: '헬스케어 (Health)', current: pHealth, target: 20 },
-        { label: '유틸리티 (Utilities)', current: pUtil, target: 15 }
+        { label: '에너지 (Energy)', key: 'energy', current: pEnergy, target: 15 },
+        { label: '기초소재 (Materials)', key: 'basic', current: pBasic, target: 15 },
+        { label: '헬스케어 (Health)', key: 'health', current: pHealth, target: 20 },
+        { label: '유틸리티 (Utilities)', key: 'utilities', current: pUtil, target: 15 }
       ],
       avoid: [
-        { label: '정보기술 (Tech)', current: pTech, target: 10 },
-        { label: '순환소비재 (Cyclical)', current: pCyc, target: 5 }
+        { label: '정보기술 (Tech)', key: 'tech', current: pTech, target: 10 },
+        { label: '순환소비재 (Cyclical)', key: 'consumer_cyc', current: pCyc, target: 5 }
       ]
     },
     recession: {
       title: "침체 국면 (Recession)",
       recommend: [
-        { label: '필수소비재 (Defensive)', current: pDef, target: 25 },
-        { label: '헬스케어 (Health)', current: pHealth, target: 30 },
-        { label: '유틸리티 (Utilities)', current: pUtil, target: 20 }
+        { label: '필수소비재 (Defensive)', key: 'consumer_def', current: pDef, target: 25 },
+        { label: '헬스케어 (Health)', key: 'health', current: pHealth, target: 30 },
+        { label: '유틸리티 (Utilities)', key: 'utilities', current: pUtil, target: 20 }
       ],
       avoid: [
-        { label: '산업재 (Industrials)', current: pInd, target: 5 },
-        { label: '기초소재 (Materials)', current: pBasic, target: 5 },
-        { label: '정보기술 (Tech)', current: pTech, target: 10 }
+        { label: '산업재 (Industrials)', key: 'ind', current: pInd, target: 5 },
+        { label: '기초소재 (Materials)', key: 'basic', current: pBasic, target: 5 },
+        { label: '정보기술 (Tech)', key: 'tech', current: pTech, target: 10 }
       ]
     }
   };
@@ -281,7 +291,6 @@ export default function ArchivePage() {
       </header>
 
       <main className="max-w-4xl mx-auto">
-        {/* 상단 5단 구조 슬라이더 제어 내비게이터 */}
         <div className="flex gap-2 mb-6 bg-gray-200 p-1 rounded-xl w-fit flex-wrap">
           <button onClick={() => setActiveTab('myassets')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'myassets' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💰 내 자산</button>
           <button onClick={() => setActiveTab('aggressive')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'aggressive' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔥 공격형 포션</button>
@@ -292,7 +301,6 @@ export default function ArchivePage() {
         </div>
 
         <section className="flex flex-col gap-6">
-          {/* 총 자산 종합 현황 상단 고정판 배너 */}
           {(activeTab === 'checker' || activeTab === 'rebalance') && (
             <div className="bg-black text-white p-6 rounded-2xl shadow-md flex justify-between items-center">
               <div><p className="text-gray-400 text-xs font-bold tracking-wider">TOTAL PORTFOLIO ASSETS</p><p className="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">{totalPortfolioValue.toLocaleString('ko-KR')}<span className="text-sm font-normal text-gray-400 ml-1">원</span></p></div>
@@ -300,10 +308,11 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {/* 종목 추가용 자동완성 검색 위젯 */}
           {activeTab !== 'checker' && activeTab !== 'rebalance' && (
             <div className="relative bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-              <label className="block text-xs font-black text-gray-500 mb-1.5 tracking-wider">🔍 현재 포트폴리오 탭에 종목 편입 (미국 대표 ETF 50종 마스터 풀 검색)</label>
+              <label className="block text-xs font-black text-gray-500 mb-1.5 tracking-wider">
+                {activeTab === 'myassets' ? '🔍 내 자산에 종목 담기 (미국 대표 ETF 50종 마스터 풀 검색)' : '🔍 현재 포트폴리오 탭에 종목 편입 (미국 대표 ETF 50종 마스터 풀 검색)'}
+              </label>
               <input 
                 type="text"
                 placeholder="예: 반도체, 빅테크, 배당, ACE, S&P500, 나스닥, 코드번호 입력 ..."
@@ -325,18 +334,17 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {/* 💡 [요구사항] 리밸런싱 모드 진입 시 사이클 셀렉터 라디오 토글바 배정 */}
           {activeTab === 'rebalance' && (
             <div className="flex flex-col gap-6">
               
-              {/* 경기 사이클 대형 국면 선택 컨트롤 박스 (첨부한 이미지 레이아웃 완벽 카피) */}
               <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                 <label className="block text-xs font-black text-slate-500 mb-3 tracking-wider">🗺️ CURRENT MACRO CYCLE STATE (현재 글로벌 경기 국면 선택)</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-100 p-1 rounded-xl">
-                  <button onClick={() => setCyclePhase('early')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'early' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>🌱 1. 초기 국면 (Early)</button>
-                  <button onClick={() => setCyclePhase('mid')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'mid' ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>⚖️ 2. 확장/중기 (Mid)</button>
-                  <button onClick={() => setCyclePhase('late')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'late' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>🍂 3. 후기 국면 (Late)</button>
-                  <button onClick={() => setCyclePhase('recession')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'recession' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>❄️ 4. 침체 국면 (Recession)</button>
+                  {/* 💡 [요구사항 1] 용어 직관화 업데이트 완료 */}
+                  <button onClick={() => setCyclePhase('early')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'early' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>🌱 1. 초기/회복기</button>
+                  <button onClick={() => setCyclePhase('mid')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'mid' ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>⚖️ 2. 확장/중기</button>
+                  <button onClick={() => setCyclePhase('late')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'late' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>🍂 3. 후기/둔화기</button>
+                  <button onClick={() => setCyclePhase('recession')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'recession' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>❄️ 4. 침체 국면</button>
                 </div>
               </div>
 
@@ -347,74 +355,120 @@ export default function ArchivePage() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-6">
-                  {/* 사이클 종합 표지 배너 */}
                   <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-2xl shadow-sm flex flex-col gap-1">
                     <span className="text-[10px] tracking-widest font-black text-teal-400 uppercase">Fidelity Macro Analysis Dashboard</span>
                     <h2 className="text-lg md:text-xl font-black">🎯 {currentCycleData.title} 진단 보고서</h2>
                   </div>
 
-                  {/* 🟢 비중 확대 추천 (더 많이 채워야 할 섹터) */}
-                  <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
-                    <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
-                      <h3 className="font-black text-gray-900 text-base flex items-center gap-1.5 text-emerald-600">🟢 비중 확대 추천 섹터 (Overweight)</h3>
-                      <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded border border-emerald-200">매수 권장</span>
-                    </div>
-                    
-                    <div className="flex flex-col gap-3">
-                      {currentCycleData.recommend.map((sec, idx) => {
-                        const gap = sec.target - sec.current;
-                        return (
-                          <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl gap-2">
-                            <span className="font-bold text-gray-800 text-sm">{sec.label}</span>
-                            <div className="flex items-center gap-4 text-xs font-semibold">
-                              <span className="text-gray-400">현재: <strong className="text-gray-700">{sec.current.toFixed(1)}%</strong></span>
-                              <span className="text-gray-400">목표: <strong className="text-gray-700">{sec.target.toFixed(1)}%</strong></span>
-                              {gap > 0 ? (
-                                <span className="text-red-500 font-black bg-red-50 px-2 py-0.5 rounded border border-red-100 animate-pulse">🚨 {gap.toFixed(1)}% 부족 (추가 매수)</span>
-                              ) : (
-                                <span className="text-emerald-600 font-black bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">✓ 충족 완료</span>
-                              )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* 🟢 비중 확대 추천 (더 많이 채워야 할 섹터) */}
+                    <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
+                      <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
+                        <h3 className="font-black text-gray-900 text-base flex items-center gap-1.5 text-emerald-600">🟢 비중 확대 추천 (Overweight)</h3>
+                        <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded border border-emerald-200">매수 권장</span>
+                      </div>
+                      
+                      <div className="flex flex-col gap-3">
+                        {currentCycleData.recommend.map((sec, idx) => {
+                          const gap = sec.target - sec.current;
+                          return (
+                            <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl gap-2">
+                              <span className="font-bold text-gray-800 text-sm">{sec.label}</span>
+                              <div className="flex items-center gap-4 text-xs font-semibold">
+                                <span className="text-gray-400">현재: <strong className="text-gray-700">{sec.current.toFixed(1)}%</strong></span>
+                                <span className="text-gray-400">목표: <strong className="text-gray-700">{sec.target.toFixed(1)}%</strong></span>
+                                {gap > 0 ? (
+                                  <span className="text-red-500 font-black bg-red-50 px-2 py-0.5 rounded border border-red-100 animate-pulse">🚨 {gap.toFixed(1)}% 부족</span>
+                                ) : (
+                                  <span className="text-emerald-600 font-black bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">✓ 충족 완료</span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 🔴 비중 축소 권고 (덜어내거나 피해야 할 섹터) */}
+                    <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
+                      <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
+                        <h3 className="font-black text-gray-900 text-base flex items-center gap-1.5 text-red-500">🔴 비중 축소 권고 (Underweight)</h3>
+                        <span className="text-[10px] bg-red-50 text-red-700 font-bold px-2 py-0.5 rounded border border-red-200">매도 권장</span>
+                      </div>
+
+                      <div className="flex flex-col gap-3">
+                        {currentCycleData.avoid.map((sec, idx) => {
+                          const excess = sec.current - sec.target;
+                          return (
+                            <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl gap-2">
+                              <span className="font-bold text-gray-800 text-sm">{sec.label}</span>
+                              <div className="flex items-center gap-4 text-xs font-semibold">
+                                <span className="text-gray-400">현재: <strong className="text-gray-700">{sec.current.toFixed(1)}%</strong></span>
+                                <span className="text-gray-400">제한선: <strong className="text-gray-700">{sec.target.toFixed(1)}%</strong></span>
+                                {excess > 0 ? (
+                                  <span className="text-amber-600 font-black bg-amber-50 px-2 py-0.5 rounded border border-amber-100">⚠️ {excess.toFixed(1)}% 초과</span>
+                                ) : (
+                                  <span className="text-blue-600 font-black bg-blue-50 px-2 py-0.5 rounded border border-blue-100">✓ 안전 범위</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
 
-                  {/* 🔴 비중 축소 권고 (덜어내거나 피해야 할 섹터) */}
-                  <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
-                    <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
-                      <h3 className="font-black text-gray-900 text-base flex items-center gap-1.5 text-red-500">🔴 비중 축소 권고 섹터 (Underweight)</h3>
-                      <span className="text-[10px] bg-red-50 text-red-700 font-bold px-2 py-0.5 rounded border border-red-200">매도 권장</span>
-                    </div>
+                  {/* 💡 [NEW 요구사항 3] 부족한 섹터를 채우기 위한 50대 마스터 풀 기반 ETF 자동 추천 엔진 */}
+                  {currentCycleData.recommend.some(sec => sec.target - sec.current > 0) && (
+                    <div className="bg-indigo-50 rounded-2xl p-4 md:p-6 shadow-sm border border-indigo-100 mt-2">
+                      <div className="flex justify-between items-center border-b border-indigo-200 pb-3 mb-4">
+                        <h3 className="font-black text-indigo-900 text-base flex items-center gap-1.5">🤖 AI 맞춤형 ETF 매수 추천</h3>
+                        <span className="text-[10px] bg-indigo-600 text-white font-bold px-2 py-0.5 rounded">마스터 풀 스캔 완료</span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {currentCycleData.recommend.filter(sec => sec.target - sec.current > 0).map((sec, idx) => {
+                          // 백엔드 풀에서 해당 섹터 비중이 가장 높은 상위 2개 ETF를 자동으로 찾아냅니다!
+                          const recommendedETFs = masterPool
+                            .filter(etf => etf.xray && etf.xray.sectors[sec.key] > 0)
+                            .sort((a, b) => b.xray.sectors[sec.key] - a.xray.sectors[sec.key])
+                            .slice(0, 2);
 
-                    <div className="flex flex-col gap-3">
-                      {currentCycleData.avoid.map((sec, idx) => {
-                        const excess = sec.current - sec.target;
-                        return (
-                          <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl gap-2">
-                            <span className="font-bold text-gray-800 text-sm">{sec.label}</span>
-                            <div className="flex items-center gap-4 text-xs font-semibold">
-                              <span className="text-gray-400">현재: <strong className="text-gray-700">{sec.current.toFixed(1)}%</strong></span>
-                              <span className="text-gray-400">제한선: <strong className="text-gray-700">{sec.target.toFixed(1)}%</strong></span>
-                              {excess > 0 ? (
-                                <span className="text-amber-600 font-black bg-amber-50 px-2 py-0.5 rounded border border-amber-100">⚠️ {excess.toFixed(1)}% 초과 (비중 축소)</span>
-                              ) : (
-                                <span className="text-blue-600 font-black bg-blue-50 px-2 py-0.5 rounded border border-blue-100">✓ 안전 범위</span>
-                              )}
+                          return (
+                            <div key={idx} className="bg-white border border-indigo-100 rounded-xl p-4 shadow-sm">
+                              <p className="text-xs font-black text-indigo-500 mb-3 border-b border-indigo-50 pb-2">
+                                [{sec.label}] 비중 확대를 위한 최적의 종목
+                              </p>
+                              <div className="flex flex-col gap-2">
+                                {recommendedETFs.length > 0 ? recommendedETFs.map((etf, i) => (
+                                  <div key={i} className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                    <div className="flex flex-col min-w-0 pr-2">
+                                      <p className="text-sm font-bold text-gray-800 truncate">{etf.name}</p>
+                                      <p className="text-[10px] text-gray-500 mt-0.5 font-semibold">내부 섹터 비중: <span className="text-indigo-600 font-black">{etf.xray.sectors[sec.key]}%</span></p>
+                                    </div>
+                                    <button 
+                                      onClick={() => handleAddStockToMyAssets(etf.code)}
+                                      className="shrink-0 text-xs font-bold text-white bg-indigo-500 px-3 py-1.5 rounded-md hover:bg-indigo-600 transition shadow-sm"
+                                    >
+                                      + 내 자산에 담기
+                                    </button>
+                                  </div>
+                                )) : (
+                                  <p className="text-xs text-gray-400">현재 풀에 추천할 만한 특화 ETF가 없습니다.</p>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                 </div>
               )}
             </div>
           )}
 
-          {/* 기본 자산/포션 전광판 리스트 (리밸런싱 탭이 아닐 때만 노출) */}
           {activeTab !== 'rebalance' && (
             <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
               <div className="grid grid-cols-12 text-[10px] md:text-xs font-bold text-gray-400 border-b border-gray-100 pb-3 mb-3 px-2">
@@ -434,6 +488,7 @@ export default function ArchivePage() {
                   ) : (
                     finalMappedItems.map((etf, index) => (
                       <div key={index} className="grid grid-cols-12 items-center px-2 py-2 border-b border-gray-50 last:border-0 gap-2">
+                        
                         <div className="col-span-5 min-w-0 flex items-center gap-2">
                           {activeTab !== 'checker' && (
                             <button onClick={() => handleRemoveStockFromTab(activeTab, etf.code)} className="text-gray-300 hover:text-red-500 text-xs font-bold transition shrink-0 p-1">✕</button>
@@ -485,7 +540,6 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {/* 보유 비중 체크 탭일 때만 하단 종합 분산 그래프 출력 */}
           {activeTab === 'checker' && totalPortfolioValue > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 transition-all duration-500">
               <div className="md:col-span-2"><RenderBarChart title="📊 실시간 구성 커스텀 포트폴리오 섹터별 비중 분석 (Sector Weight)" data={sectorsFinal} purple={true} /></div>
