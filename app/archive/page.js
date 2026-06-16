@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-// 💡 [초대형 업데이트] recharts 도넛 차트 및 선형 그래프 모듈 임포트
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
 export default function ArchivePage() {
@@ -103,7 +102,7 @@ export default function ArchivePage() {
   const getRawPrice = (valStr) => parseFloat(valStr.replace(/[^0-9.-]/g, '')) || 0;
 
   let totalPortfolioValue = 0;
-  let totalAnnualDividend = 0; // 💡 연간 배당금 총합 연산 변수
+  let totalAnnualDividend = 0; 
   let sectorTotals = { tech: 0, finance: 0, health: 0, consumer_cyc: 0, ind: 0, communication: 0, consumer_def: 0, energy: 0, utilities: 0, basic: 0, realestate: 0 };
   let sizeTotals = { large: 0, mid: 0, small: 0 };
   let styleTotals = { value: 0, blend: 0, growth: 0 };
@@ -120,7 +119,6 @@ export default function ArchivePage() {
     if (isCalculationRequired) {
       totalPortfolioValue += evalValue;
       if (foundData && foundData.xray) {
-        // 배당금 가중치 누적
         if(foundData.xray.div) totalAnnualDividend += evalValue * (foundData.xray.div / 100);
 
         Object.keys(sectorTotals).forEach(k => { sectorTotals[k] += evalValue * ((foundData.xray.sectors?.[k] || 0) / 100); });
@@ -153,16 +151,13 @@ export default function ArchivePage() {
 
   const getPercentage = (subValue) => totalPortfolioValue > 0 ? (subValue / totalPortfolioValue) * 100 : 0;
 
-  // 💡 [기능 1] 도넛 차트 전용 데이터 및 색상 팔레트 세팅
   const pieChartData = finalMappedItems.filter(item => item.realWeight > 0).map(item => ({ name: item.name, value: item.realWeight }));
   const PIE_COLORS = ['#4f46e5', '#ec4899', '#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#64748b'];
 
-  // 💡 [기능 2] 배당 파이프라인 연산 (세전/세후 15.4%)
   const avgDivYield = totalPortfolioValue > 0 ? (totalAnnualDividend / totalPortfolioValue) * 100 : 0;
   const afterTaxAnnualDiv = totalAnnualDividend * (1 - 0.154);
   const monthlyDiv = afterTaxAnnualDiv / 12;
 
-  // 💡 [기능 3] 5년 과거 수익률 시뮬레이션 백테스팅 곡선 데이터 연산
   const weightedCagr1y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['1y'] || 0) * (item.realWeight / 100), 0);
   const weightedCagr3y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['3y'] || 0) * (item.realWeight / 100), 0);
   const weightedCagr5y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['5y'] || 0) * (item.realWeight / 100), 0);
@@ -177,7 +172,6 @@ export default function ArchivePage() {
     }
   }
 
-  // 매크로 및 섹터 데이터 연산...
   const pTech = getPercentage(sectorTotals.tech); const pFin = getPercentage(sectorTotals.finance);
   const pHealth = getPercentage(sectorTotals.health); const pInd = getPercentage(sectorTotals.ind);
   const pCyc = getPercentage(sectorTotals.consumer_cyc); const pComm = getPercentage(sectorTotals.communication);
@@ -241,7 +235,6 @@ export default function ArchivePage() {
       </header>
 
       <main className="max-w-5xl mx-auto">
-        {/* 💡 상단 메뉴바가 넘치지 않도록 깔끔하게 스크롤 및 래핑 처리 */}
         <div className="flex gap-2 mb-6 bg-gray-200 p-1 rounded-xl w-full overflow-x-auto whitespace-nowrap hide-scrollbar">
           <button onClick={() => setActiveTab('myassets')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'myassets' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💰 내 자산</button>
           <button onClick={() => setActiveTab('aggressive')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'aggressive' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔥 공격형</button>
@@ -261,7 +254,6 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {/* 💡 [기능 2] 배당 파이프라인 탭 렌더링 */}
           {activeTab === 'dividend' && (
             <div className="flex flex-col gap-6">
               <div className="bg-gradient-to-r from-rose-50 to-pink-50 border border-pink-100 rounded-2xl p-6 shadow-sm">
@@ -284,7 +276,6 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {/* 💡 [기능 3] 백테스팅 탭 렌더링 */}
           {activeTab === 'backtest' && (
             <div className="flex flex-col gap-6">
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-indigo-100 rounded-2xl p-6 shadow-sm">
@@ -456,6 +447,7 @@ export default function ArchivePage() {
             </div>
           )}
 
+          {/* 💡 [수정] 모바일 화면에서 잘리지 않도록 리스트 제어 및 도넛 차트 컬러 패치! */}
           {!['dividend', 'backtest', 'rebalance'].includes(activeTab) && (
             <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
               <div className="grid grid-cols-12 text-[10px] md:text-xs font-bold text-gray-400 border-b border-gray-100 pb-3 mb-3 px-2">
@@ -474,18 +466,19 @@ export default function ArchivePage() {
                     </div>
                   ) : (
                     finalMappedItems.map((etf, index) => (
-                      <div key={index} className="grid grid-cols-12 items-center px-2 py-2 border-b border-gray-50 last:border-0 gap-2">
-                        <div className="col-span-5 min-w-0 flex items-center gap-2">
+                      <div key={index} className="grid grid-cols-12 items-center px-2 py-2.5 border-b border-gray-50 last:border-0 gap-2">
+                        <div className="col-span-5 min-w-0 flex items-center gap-1.5 h-full">
                           {activeTab !== 'checker' && (
                             <button onClick={() => handleRemoveStockFromTab(activeTab, etf.code)} className="text-gray-300 hover:text-red-500 text-xs font-bold transition shrink-0 p-1">✕</button>
                           )}
-                          <div className="flex flex-col justify-between h-[36px] min-w-0 py-0.5">
-                            <p className="font-bold text-gray-900 text-sm md:text-base truncate leading-none">{etf.name}</p>
-                            <p className="text-[10px] md:text-xs text-gray-400 font-medium leading-none">ETF {etf.code}</p>
+                          <div className="flex flex-col justify-center min-w-0 gap-0.5">
+                            {/* 💡 [패치 1] 모바일에서 풀네임이 잘리지 않도록 글씨 크기를 11px로 줄이고 줄바꿈을 허용했습니다. */}
+                            <p className="font-bold text-gray-900 text-[11px] md:text-sm leading-tight break-keep">{etf.name}</p>
+                            <p className="text-[9px] md:text-[11px] text-gray-400 font-medium leading-none">ETF {etf.code}</p>
                           </div>
                         </div>
 
-                        <div className="col-span-3 flex justify-center items-center h-[36px]">
+                        <div className="col-span-3 flex justify-center items-center h-full">
                           {activeTab === 'checker' ? (
                             <input type="number" min="0" placeholder="0" value={etf.qty === 0 ? '' : etf.qty} onChange={(e) => handleQtyChange(etf.code, e.target.value)} className="w-full max-w-[70px] md:max-w-[100px] text-center border border-gray-300 rounded-lg p-1 text-sm font-bold bg-gray-50 focus:bg-white focus:ring-2 focus:ring-black outline-none transition" />
                           ) : (
@@ -499,20 +492,21 @@ export default function ArchivePage() {
                           )}
                         </div>
 
-                        <div className="col-span-4 flex flex-col items-end justify-between h-[36px] py-0.5">
+                        <div className="col-span-4 flex flex-col items-end justify-center h-full gap-0.5">
                           {activeTab === 'checker' ? (
                             <>
-                              <span className="text-sm md:text-base font-extrabold text-gray-900 tracking-tight leading-none">{etf.evalValue.toLocaleString('ko-KR')}<span className="text-[10px] md:text-xs font-normal text-gray-400 ml-0.5">원</span></span>
-                              <div className="flex items-center h-[14px]">
+                              {/* 💡 [패치 1] 숫자 폰트 크기도 살짝 압축하여 공간을 확보했습니다. */}
+                              <span className="text-xs md:text-sm font-extrabold text-gray-900 tracking-tight leading-none text-right break-all">{etf.evalValue.toLocaleString('ko-KR')}<span className="text-[9px] md:text-[10px] font-normal text-gray-400 ml-0.5">원</span></span>
+                              <div className="flex items-center">
                                 <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-1.5 py-[1px] rounded tracking-tighter leading-none">{etf.realWeight.toFixed(1)}%</span>
                               </div>
                             </>
                           ) : (
                             <>
-                              <span className="text-sm md:text-base font-extrabold text-gray-900 tracking-tight leading-none">{etf.value}<span className="text-[10px] md:text-xs font-normal text-gray-400 ml-0.5">원</span></span>
-                              <div className="flex items-center gap-0.5 text-[10px] md:text-xs font-bold leading-none h-[14px]">
-                                {etf.isUp === true && <svg className="w-3 h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
-                                {etf.isUp === false && <svg className="w-3 h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
+                              <span className="text-xs md:text-sm font-extrabold text-gray-900 tracking-tight leading-none text-right">{etf.value}<span className="text-[9px] md:text-[10px] font-normal text-gray-400 ml-0.5">원</span></span>
+                              <div className="flex items-center gap-0.5 text-[9px] md:text-xs font-bold leading-none mt-0.5">
+                                {etf.isUp === true && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
+                                {etf.isUp === false && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
                                 <span className={etf.isUp === true ? 'text-pink-600' : etf.isUp === false ? 'text-blue-500' : 'text-gray-500'}>{etf.change}</span>
                               </div>
                             </>
@@ -529,16 +523,28 @@ export default function ArchivePage() {
           {activeTab === 'checker' && totalPortfolioValue > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 transition-all duration-500">
               
-              {/* 💡 [기능 1] 보유 비중 탭 최상단에 예쁜 원형 도넛(Pie) 차트 추가 완료! */}
               <div className="md:col-span-2 bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
                 <h3 className="font-extrabold text-gray-900 text-sm md:text-base border-b border-gray-50 pb-2 mb-4">🍩 내 포트폴리오 종목 비중 (Donut Chart)</h3>
                 <div className="h-[250px] md:h-[350px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={pieChartData} cx="50%" cy="50%" innerRadius="55%" outerRadius="80%" paddingAngle={5} dataKey="value" stroke="none" label={({ name, percent }) => `${name.replace(/미국|KODEX|TIGER|ACE|SOL|KBSTAR|PLUS|HANARO|\(H\)|합성/g, '').trim()} ${(percent * 100).toFixed(1)}%`} labelLine={false} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#475569' }}>
-                        {pieChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                        ))}
+                      <Pie 
+                        data={pieChartData} 
+                        cx="50%" 
+                        cy="50%" 
+                        innerRadius="55%" 
+                        outerRadius="75%" 
+                        paddingAngle={5} 
+                        dataKey="value" 
+                        stroke="none" 
+                        label={({ name, percent }) => `${name.replace(/미국|KODEX|TIGER|ACE|SOL|KBSTAR|PLUS|HANARO|\(H\)|합성/g, '').trim()} ${(percent * 100).toFixed(1)}%`} 
+                        labelLine={true} 
+                      >
+                        {/* 💡 [패치 2] Tailwind의 기본 회색 덮어쓰기를 원천 차단하기 위해 style={{ fill: color }}를 인라인으로 강제 주입! */}
+                        {pieChartData.map((entry, index) => {
+                          const color = PIE_COLORS[index % PIE_COLORS.length];
+                          return <Cell key={`cell-${index}`} fill={color} style={{ fill: color, outline: 'none' }} />;
+                        })}
                       </Pie>
                       <RechartsTooltip formatter={(value) => value.toFixed(1) + '%'} />
                     </PieChart>
