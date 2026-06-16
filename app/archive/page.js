@@ -199,7 +199,7 @@ export default function ArchivePage() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
       <header className="max-w-4xl mx-auto mb-8 flex justify-between items-center border-b border-gray-200 pb-6">
-        <div><p className="text-blue-600 font-bold text-xs md:text-sm tracking-wider">PORTFOLIO BUILDER Master</p><h1 className="text-xl md:text-3xl font-extrabold text-gray-900 mt-1">나만의 ETF 포트폴리오 빌더</h1></div>
+        <div><p className="text-blue-600 font-bold text-xs md:text-sm tracking-wider">PORTFOLIO BUILDER Master</p><h1 className="text-xl md:text-3xl font-extrabold text-gray-900 mt-1">ETF 포트폴리오</h1></div>
         <Link href="/" className="bg-gray-200 text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm hover:bg-gray-300 transition shrink-0">← 메인으로</Link>
       </header>
 
@@ -224,11 +224,11 @@ export default function ArchivePage() {
           {activeTab !== 'checker' && (
             <div className="relative bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
               <label className="block text-xs font-black text-gray-500 mb-1.5 tracking-wider">
-                {activeTab === 'myassets' ? '🔍 내 자산에 종목 담기 (미국 대표 ETF 50종 마스터 풀 검색)' : '🔍 현재 탭에 종목 추가 (미국 대표 ETF 50종)'}
+                {activeTab === 'myassets' ? '🔍 종목 담기 (미국 대표 ETF 50종)' : '🔍 현재 탭에 종목 추가 (미국 대표 ETF 50종)'}
               </label>
               <input 
                 type="text"
-                placeholder="예: 반도체, 빅테크, 배당, ACE, S&P500, 나스닥, 코드번호 입력 ..."
+                placeholder="예: 반도체, ACE, S&P500..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setIsDropdownOpen(e.target.value !== ''); }}
                 onFocus={() => { if(searchQuery !== '') setIsDropdownOpen(true); }}
