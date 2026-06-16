@@ -219,7 +219,6 @@ export default function ArchivePage() {
     late: {
       title: "후기/둔화기 국면 (Late-Cycle)",
       recommend: [
-        { label: '에너지 (Energy)', key: 'energy', current: pEnergy, target: 15 },
         { label: '기초소재 (Materials)', key: 'basic', current: pBasic, target: 15 },
         { label: '헬스케어 (Health)', key: 'health', current: pHealth, target: 20 },
         { label: '유틸리티 (Utilities)', key: 'utilities', current: pUtil, target: 15 }
@@ -286,17 +285,17 @@ export default function ArchivePage() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
       <header className="max-w-4xl mx-auto mb-8 flex justify-between items-center border-b border-gray-200 pb-6">
-        <div><p className="text-blue-600 font-bold text-xs md:text-sm tracking-wider">PORTFOLIO BUILDER Master</p><h1 className="text-xl md:text-3xl font-extrabold text-gray-900 mt-1">나만의 ETF 포트폴리오 빌더</h1></div>
+        <div><p className="text-blue-600 font-bold text-xs md:text-sm tracking-wider">PORTFOLIO BUILDER Master</p><h1 className="text-xl md:text-3xl font-extrabold text-gray-900 mt-1">ETF 포트폴리오 빌더</h1></div>
         <Link href="/" className="bg-gray-200 text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm hover:bg-gray-300 transition shrink-0">← 메인으로</Link>
       </header>
 
       <main className="max-w-4xl mx-auto">
         <div className="flex gap-2 mb-6 bg-gray-200 p-1 rounded-xl w-fit flex-wrap">
           <button onClick={() => setActiveTab('myassets')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'myassets' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💰 내 자산</button>
-          <button onClick={() => setActiveTab('aggressive')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'aggressive' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔥 공격형 포션</button>
-          <button onClick={() => setActiveTab('neutral')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'neutral' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>⚖️ 중립형 포션</button>
-          <button onClick={() => setActiveTab('stable')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'stable' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🛡️ 안정형 포션</button>
-          <button onClick={() => setActiveTab('checker')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'checker' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📊 보유 비중 체크</button>
+          <button onClick={() => setActiveTab('aggressive')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'aggressive' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔥 공격형</button>
+          <button onClick={() => setActiveTab('neutral')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'neutral' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>⚖️ 중립형</button>
+          <button onClick={() => setActiveTab('stable')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'stable' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🛡️ 안정형</button>
+          <button onClick={() => setActiveTab('checker')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'checker' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📊 보유 비중</button>
           <button onClick={() => setActiveTab('rebalance')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'rebalance' ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔄 리밸런싱</button>
         </div>
 
@@ -311,11 +310,11 @@ export default function ArchivePage() {
           {activeTab !== 'checker' && activeTab !== 'rebalance' && (
             <div className="relative bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
               <label className="block text-xs font-black text-gray-500 mb-1.5 tracking-wider">
-                {activeTab === 'myassets' ? '🔍 내 자산에 종목 담기 (미국 대표 ETF 50종 마스터 풀 검색)' : '🔍 현재 포트폴리오 탭에 종목 편입 (미국 대표 ETF 50종 마스터 풀 검색)'}
+                {activeTab === 'myassets' ? '🔍 종목 담기 (미국 대표 ETF 50종)' : '🔍 현재 탭에 종목 편입 (미국 대표 ETF 50종)'}
               </label>
               <input 
                 type="text"
-                placeholder="예: 반도체, 빅테크, 배당, ACE, S&P500, 나스닥, 코드번호 입력 ..."
+                placeholder="예: 반도체, ACE, S&P500..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setIsDropdownOpen(e.target.value !== ''); }}
                 onFocus={() => { if(searchQuery !== '') setIsDropdownOpen(true); }}
