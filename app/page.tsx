@@ -76,30 +76,32 @@ function StockTicker() {
   const line2Macros = liveData && liveData.length >= 6 ? liveData.slice(6) : defaultMacros;
 
   const renderItem = (item, index) => (
-    <div key={index} className="p-4 border-b md:border-b-0 md:border-r border-white flex flex-col justify-between bg-gray-100 hover:bg-gray-200 transition cursor-default">
-      <span className="text-sm font-bold text-gray-800 mb-2">{item.name}</span>
-      <div className="flex justify-between items-end">
-        {/* 💡 [요구사항 1] 모바일 환경(기본값)에서 숫자 크기를 1포인트 축소 (text-lg -> text-base, PC는 md:text-xl 보존) */}
-        <span className="text-base md:text-xl font-extrabold tracking-tighter text-gray-900 leading-none">
-          {item.value}<span className="text-xs md:text-sm font-normal ml-1 text-gray-500">{item.suffix || ''}</span>
+    <div key={index} className="p-3 md:p-4 border-b md:border-b-0 md:border-r border-white flex flex-col justify-between bg-gray-100 hover:bg-gray-200 transition cursor-default">
+      <span className="text-xs md:text-sm font-bold text-gray-800 mb-2 truncate">{item.name}</span>
+      <div className="flex justify-between items-end gap-2">
+        {/* 💡 지수 숫자 크기를 text-sm(모바일), text-lg(PC)로 한 단계 더 축소하여 공간 확보 */}
+        <span className="text-sm md:text-lg font-extrabold tracking-tighter text-gray-900 leading-none truncate pr-1">
+          {item.value}<span className="text-[10px] md:text-xs font-normal ml-0.5 text-gray-500">{item.suffix || ''}</span>
         </span>
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center gap-1 leading-none">
-            {item.isUp === true && <svg className="w-4 h-4 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
-            {item.isUp === false && <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
-            <span className={`text-sm font-semibold ${item.isUp === true ? 'text-pink-600' : item.isUp === false ? 'text-blue-500' : 'text-gray-500'}`}>{item.change}</span>
+        {/* 우측 퍼센트 영역이 찌그러지지 않도록 shrink-0 부여 */}
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 md:gap-1 leading-none">
+            {item.isUp === true && <svg className="w-3 h-3 md:w-4 md:h-4 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
+            {item.isUp === false && <svg className="w-3 h-3 md:w-4 md:h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
+            <span className={`text-xs md:text-sm font-semibold ${item.isUp === true ? 'text-pink-600' : item.isUp === false ? 'text-blue-500' : 'text-gray-500'}`}>{item.change}</span>
           </div>
           {item.spotChange && (
-            <div className="flex items-center gap-1 leading-none mt-1">
-              <span className="text-[10px] bg-gray-300 text-gray-600 px-1 rounded font-bold tracking-tighter">현물</span>
-              {item.isSpotUp === true && <svg className="w-3 h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
-              {item.isSpotUp === false && <svg className="w-3 h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
-              <span className={`text-xs font-semibold ${item.isSpotUp === true ? 'text-pink-600' : item.isSpotUp === false ? 'text-blue-500' : 'text-gray-500'}`}>{item.spotChange}</span>
+            <div className="flex items-center gap-0.5 md:gap-1 leading-none mt-1">
+              {/* 💡 "현물" -> "현" 으로 1글자 축소, 폰트도 [9px]로 압축 */}
+              <span className="text-[9px] bg-gray-300 text-gray-600 px-1 rounded font-bold tracking-tighter">현</span>
+              {item.isSpotUp === true && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
+              {item.isSpotUp === false && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
+              <span className={`text-[10px] md:text-xs font-semibold ${item.isSpotUp === true ? 'text-pink-600' : item.isSpotUp === false ? 'text-blue-500' : 'text-gray-500'}`}>{item.spotChange}</span>
             </div>
           )}
         </div>
       </div>
-      <div className={`h-1 w-full mt-3 ${item.isUp === true ? 'bg-pink-600' : item.isUp === false ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+      <div className={`h-1 w-full mt-2 md:mt-3 ${item.isUp === true ? 'bg-pink-600' : item.isUp === false ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
     </div>
   );
 
@@ -140,34 +142,24 @@ export default function Home() {
       <main className="max-w-7xl mx-auto">
         <StockTicker />
         
-        {/* 💡 [요구사항 2] 거시경제 포털 배지 정렬 순서 업데이트 및 StockAnalysis 추가 완료 */}
         <section className="bg-black text-white rounded-2xl p-6 shadow-lg mb-12">
           <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-            {/* 1. 한경 글로벌마켓 */}
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-red-400 font-bold text-xs bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">Global</span>
               <a href="https://www.hankyung.com/globalmarket/global-equity-market" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 글로벌마켓</a>
             </li>
-            
-            {/* 2. 한경 코리안마켓 */}
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-blue-400 font-bold text-xs bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900 min-w-[56px] text-center">Korea</span>
               <a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 코리안마켓</a>
             </li>
-            
-            {/* 3. [NEW] Stock Analysis */}
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-purple-400 font-bold text-xs bg-purple-950/50 px-2 py-0.5 rounded border border-purple-900 min-w-[56px] text-center">Analysis</span>
               <a href="https://stockanalysis.com/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">StockAnalysis</a>
             </li>
-            
-            {/* 4. 경기사이클 */}
             <li className="flex gap-4 items-center border-b lg:border-b-0 border-gray-900 pb-3 lg:pb-0 pt-1">
               <span className="text-amber-400 font-bold text-xs bg-amber-950/50 px-2 py-0.5 rounded border border-amber-900 min-w-[56px] text-center">Cycle</span>
               <a href="https://institutional.fidelity.com/app/item/RD_13569_40890.html" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">경기사이클</a>
             </li>
-            
-            {/* 5. FED 점도표 */}
             <li className="flex gap-4 items-center pt-1">
               <span className="text-emerald-400 font-bold text-xs bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900 min-w-[56px] text-center">FED</span>
               <a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">FED 점도표</a>
