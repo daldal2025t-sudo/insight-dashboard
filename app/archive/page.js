@@ -3,25 +3,28 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function ArchivePage() {
-  const [activeTab, setActiveTab] = useState('aggressive');
+  // 💡 앱이 켜질 때 가장 먼저 보이는 기본 탭을 '내 자산(myassets)'으로 변경했습니다.
+  const [activeTab, setActiveTab] = useState('myassets');
   const [masterPool, setMasterPool] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // 💡 '내 자산' 배열을 추가하여 4개의 포트폴리오 저장소를 관리합니다.
   const [tabLists, setTabLists] = useState({
+    myassets: [], // 빈 도화지로 시작하여 마음대로 추가 가능!
     aggressive: [
-      { code: '360750', weight: '65%' },
+      { code: '449190', weight: '65%' },
       { code: '0046Y0', weight: '25%' }, 
       { code: '280930', weight: '10%' }
     ],
     neutral: [
-      { code: '360200', weight: '30%' },
+      { code: '449180', weight: '30%' },
       { code: '0046Y0', weight: '20%' },
       { code: '488500', weight: '10%' },
       { code: '309230', weight: '10%' },
       { code: '280930', weight: '10%' }
     ],
     stable: [
-      { code: '360200', weight: '30%' },
+      { code: '449180', weight: '30%' },
       { code: '488500', weight: '10%' },
       { code: '452360', weight: '20%' },
       { code: '429000', weight: '10%' }
@@ -94,7 +97,9 @@ export default function ArchivePage() {
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.code.includes(searchQuery)
   );
 
+  // 💡 내 자산 탭에 등록된 종목들도 계산기(checker)에 자동으로 동기화되도록 합집합 처리
   const activeCheckerCodes = Array.from(new Set([
+    ...tabLists.myassets.map(i => i.code),
     ...tabLists.aggressive.map(i => i.code),
     ...tabLists.neutral.map(i => i.code),
     ...tabLists.stable.map(i => i.code)
@@ -199,7 +204,9 @@ export default function ArchivePage() {
       </header>
 
       <main className="max-w-4xl mx-auto">
+        {/* 💡 [내 자산] 탭을 최좌측(가장 첫 번째)에 배치 완료 */}
         <div className="flex gap-2 mb-6 bg-gray-200 p-1 rounded-xl w-fit flex-wrap">
+          <button onClick={() => setActiveTab('myassets')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'myassets' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💰 내 자산</button>
           <button onClick={() => setActiveTab('aggressive')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'aggressive' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔥 공격형 포션</button>
           <button onClick={() => setActiveTab('neutral')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'neutral' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>⚖️ 중립형 포션</button>
           <button onClick={() => setActiveTab('stable')} className={`px-3 py-2 md:px-5 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === 'stable' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🛡️ 안정형 포션</button>
@@ -216,7 +223,9 @@ export default function ArchivePage() {
 
           {activeTab !== 'checker' && (
             <div className="relative bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-              <label className="block text-xs font-black text-gray-500 mb-1.5 tracking-wider">🔍 현재 포트폴리오 탭에 종목 편입 (미국 대표 ETF 50종 마스터 풀 검색)</label>
+              <label className="block text-xs font-black text-gray-500 mb-1.5 tracking-wider">
+                {activeTab === 'myassets' ? '🔍 내 자산에 종목 담기 (미국 대표 ETF 50종 마스터 풀 검색)' : '🔍 현재 탭에 종목 추가 (미국 대표 ETF 50종)'}
+              </label>
               <input 
                 type="text"
                 placeholder="예: 반도체, 빅테크, 배당, ACE, S&P500, 나스닥, 코드번호 입력 ..."
@@ -239,7 +248,6 @@ export default function ArchivePage() {
           )}
 
           <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
-            {/* 💡 헤더 그리드 총 12칸 (5+3+4) 맞춤 완료 */}
             <div className="grid grid-cols-12 text-[10px] md:text-xs font-bold text-gray-400 border-b border-gray-100 pb-3 mb-3 px-2">
               <span className="col-span-5">ETF 종목정보</span>
               <span className="col-span-3 text-center">{activeTab === 'checker' ? '보유개수' : '목표비중 / 순서'}</span>
@@ -250,57 +258,62 @@ export default function ArchivePage() {
               <div className="text-center py-12 text-gray-400 font-bold text-sm">마스터 데이터 파싱 엔진 동기화 중... ⏳</div>
             ) : (
               <div className="flex flex-col gap-2">
-                {finalMappedItems.map((etf, index) => (
-                  <div key={index} className="grid grid-cols-12 items-center px-2 py-2 border-b border-gray-50 last:border-0 gap-2">
-                    
-                    {/* 💡 바디 1열 그리드 5칸 (col-span-5) 고정 완료 */}
-                    <div className="col-span-5 min-w-0 flex items-center gap-2">
-                      {activeTab !== 'checker' && (
-                        <button onClick={() => handleRemoveStockFromTab(activeTab, etf.code)} className="text-gray-300 hover:text-red-500 text-xs font-bold transition shrink-0 p-1">✕</button>
-                      )}
-                      <div className="flex flex-col justify-between h-[36px] min-w-0 py-0.5">
-                        <p className="font-bold text-gray-900 text-sm md:text-base truncate leading-none">{etf.name}</p>
-                        <p className="text-[10px] md:text-xs text-gray-400 font-medium leading-none">ETF {etf.code}</p>
+                {finalMappedItems.length === 0 && activeTab === 'myassets' ? (
+                  <div className="text-center py-10 text-gray-400 font-bold text-sm">
+                    아직 담은 종목이 없습니다. <br/><span className="text-xs font-medium text-gray-400 mt-2 block">위의 검색창에서 ETF를 찾아 나만의 포트폴리오를 만들어보세요!</span>
+                  </div>
+                ) : (
+                  finalMappedItems.map((etf, index) => (
+                    <div key={index} className="grid grid-cols-12 items-center px-2 py-2 border-b border-gray-50 last:border-0 gap-2">
+                      
+                      <div className="col-span-5 min-w-0 flex items-center gap-2">
+                        {activeTab !== 'checker' && (
+                          <button onClick={() => handleRemoveStockFromTab(activeTab, etf.code)} className="text-gray-300 hover:text-red-500 text-xs font-bold transition shrink-0 p-1">✕</button>
+                        )}
+                        <div className="flex flex-col justify-between h-[36px] min-w-0 py-0.5">
+                          <p className="font-bold text-gray-900 text-sm md:text-base truncate leading-none">{etf.name}</p>
+                          <p className="text-[10px] md:text-xs text-gray-400 font-medium leading-none">ETF {etf.code}</p>
+                        </div>
+                      </div>
+
+                      <div className="col-span-3 flex justify-center items-center h-[36px]">
+                        {activeTab === 'checker' ? (
+                          <input type="number" min="0" placeholder="0" value={etf.qty === 0 ? '' : etf.qty} onChange={(e) => handleQtyChange(etf.code, e.target.value)} className="w-full max-w-[70px] md:max-w-[100px] text-center border border-gray-300 rounded-lg p-1 text-sm font-bold bg-gray-50 focus:bg-white focus:ring-2 focus:ring-black outline-none transition" />
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <div className="flex flex-col text-[10px] text-gray-400 font-bold shrink-0">
+                              <button onClick={() => handleMoveOrder(activeTab, index, 'up')} disabled={index === 0} className="hover:text-black disabled:opacity-20 leading-none py-0.5">▲</button>
+                              <button onClick={() => handleMoveOrder(activeTab, index, 'down')} disabled={index === finalMappedItems.length - 1} className="hover:text-black disabled:opacity-20 leading-none py-0.5">▼</button>
+                            </div>
+                            <input type="text" value={etf.targetWeight || '0%'} onChange={(e) => handleWeightChange(activeTab, etf.code, e.target.value)} className="w-12 md:w-14 border border-gray-200 rounded text-center text-xs font-bold bg-slate-50 text-blue-600 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none py-0.5" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="col-span-4 flex flex-col items-end justify-between h-[36px] py-0.5">
+                        {activeTab === 'checker' ? (
+                          <>
+                            <span className="text-sm md:text-base font-extrabold text-gray-900 tracking-tight leading-none">{etf.evalValue.toLocaleString('ko-KR')}<span className="text-[10px] md:text-xs font-normal text-gray-400 ml-0.5">원</span></span>
+                            <div className="flex items-center h-[14px]">
+                              <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-1.5 py-[1px] rounded tracking-tighter leading-none">
+                                {etf.realWeight.toFixed(1)}%
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-sm md:text-base font-extrabold text-gray-900 tracking-tight leading-none">{etf.value}<span className="text-[10px] md:text-xs font-normal text-gray-400 ml-0.5">원</span></span>
+                            <div className="flex items-center gap-0.5 text-[10px] md:text-xs font-bold leading-none h-[14px]">
+                              {etf.isUp === true && <svg className="w-3 h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
+                              {etf.isUp === false && <svg className="w-3 h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
+                              <span className={etf.isUp === true ? 'text-pink-600' : etf.isUp === false ? 'text-blue-500' : 'text-gray-500'}>{etf.change}</span>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
-
-                    <div className="col-span-3 flex justify-center items-center h-[36px]">
-                      {activeTab === 'checker' ? (
-                        <input type="number" min="0" placeholder="0" value={etf.qty === 0 ? '' : etf.qty} onChange={(e) => handleQtyChange(etf.code, e.target.value)} className="w-full max-w-[70px] md:max-w-[100px] text-center border border-gray-300 rounded-lg p-1 text-sm font-bold bg-gray-50 focus:bg-white focus:ring-2 focus:ring-black outline-none transition" />
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <div className="flex flex-col text-[10px] text-gray-400 font-bold shrink-0">
-                            <button onClick={() => handleMoveOrder(activeTab, index, 'up')} disabled={index === 0} className="hover:text-black disabled:opacity-20 leading-none py-0.5">▲</button>
-                            <button onClick={() => handleMoveOrder(activeTab, index, 'down')} disabled={index === finalMappedItems.length - 1} className="hover:text-black disabled:opacity-20 leading-none py-0.5">▼</button>
-                          </div>
-                          <input type="text" value={etf.targetWeight || '0%'} onChange={(e) => handleWeightChange(activeTab, etf.code, e.target.value)} className="w-12 md:w-14 border border-gray-200 rounded text-center text-xs font-bold bg-slate-50 text-blue-600 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none py-0.5" />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="col-span-4 flex flex-col items-end justify-between h-[36px] py-0.5">
-                      {activeTab === 'checker' ? (
-                        <>
-                          <span className="text-sm md:text-base font-extrabold text-gray-900 tracking-tight leading-none">{etf.evalValue.toLocaleString('ko-KR')}<span className="text-[10px] md:text-xs font-normal text-gray-400 ml-0.5">원</span></span>
-                          <div className="flex items-center h-[14px]">
-                            <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-1.5 py-[1px] rounded tracking-tighter leading-none">
-                              {etf.realWeight.toFixed(1)}%
-                            </span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <span className="text-sm md:text-base font-extrabold text-gray-900 tracking-tight leading-none">{etf.value}<span className="text-[10px] md:text-xs font-normal text-gray-400 ml-0.5">원</span></span>
-                          <div className="flex items-center gap-0.5 text-[10px] md:text-xs font-bold leading-none h-[14px]">
-                            {etf.isUp === true && <svg className="w-3 h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
-                            {etf.isUp === false && <svg className="w-3 h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
-                            <span className={etf.isUp === true ? 'text-pink-600' : etf.isUp === false ? 'text-blue-500' : 'text-gray-500'}>{etf.change}</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             )}
           </div>

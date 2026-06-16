@@ -127,7 +127,7 @@ export default function Home() {
           <h1 className="text-2xl md:text-4xl font-extrabold text-gray-900 mt-1 mb-2">KIJAY Daily Insight</h1>
           <p className="text-gray-500 text-xs md:text-sm">실시간 경제 및 글로벌 자산 시장의 핵심 지표를 트래킹하는 금융 대시보드입니다.</p>
         </div>
-        <Link href="/archive" className="bg-black text-white px-4 py-2 md:px-5 md:py-2 rounded-full font-bold text-xs md:text-sm hover:bg-gray-800 transition shrink-0">아카이브 보기</Link>
+        <Link href="/archive" className="bg-black text-white px-4 py-2 md:px-5 md:py-2 rounded-full font-bold text-xs md:text-sm hover:bg-gray-800 transition shrink-0">포트폴리오</Link>
       </header>
       <main className="max-w-7xl mx-auto">
         <StockTicker />
