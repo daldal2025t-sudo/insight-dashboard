@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "KIJAY Daily News",
+  title: "KIJAY Daily Insight",
   description: "글로벌 증시, 환율, 핵심 경제 뉴스를 한눈에 모아보는 플랫폼입니다.",
 };
 
