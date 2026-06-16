@@ -2,6 +2,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+// ==========================================
+// 1. 뉴스 카드 컴포넌트
+// ==========================================
 function NewsCard({ category }) {
   const [news, setNews] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +52,9 @@ function NewsCard({ category }) {
   );
 }
 
+// ==========================================
+// 2. 듀얼 모니터링 탑재 지표 전광판
+// ==========================================
 function StockTicker() {
   const [liveData, setLiveData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,7 +79,8 @@ function StockTicker() {
     <div key={index} className="p-4 border-b md:border-b-0 md:border-r border-white flex flex-col justify-between bg-gray-100 hover:bg-gray-200 transition cursor-default">
       <span className="text-sm font-bold text-gray-800 mb-2">{item.name}</span>
       <div className="flex justify-between items-end">
-        <span className="text-lg md:text-xl font-extrabold tracking-tighter text-gray-900 leading-none">
+        {/* 💡 [요구사항 1] 모바일 환경(기본값)에서 숫자 크기를 1포인트 축소 (text-lg -> text-base, PC는 md:text-xl 보존) */}
+        <span className="text-base md:text-xl font-extrabold tracking-tighter text-gray-900 leading-none">
           {item.value}<span className="text-xs md:text-sm font-normal ml-1 text-gray-500">{item.suffix || ''}</span>
         </span>
         <div className="flex flex-col items-end gap-1">
@@ -109,15 +116,15 @@ function StockTicker() {
         <div className="bg-slate-700 text-white px-4 py-2 flex justify-between items-center">
           <h2 className="text-lg font-bold tracking-tight">외환 및 주요 거시경제 지표 (실시간)</h2>
         </div>
-        {/* 💡 모바일 화면에서 1줄(grid-cols-1)로 나오던 것을 2줄(grid-cols-2)로 교정 완료 */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-          {line2Macros.map((macro, index) => renderItem(macro, index))}
-        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5">{line2Macros.map((macro, index) => renderItem(macro, index))}</div>
       </div>
     </section>
   );
 }
 
+// ==========================================
+// 3. 전체 메인 화면
+// ==========================================
 export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
@@ -129,16 +136,45 @@ export default function Home() {
         </div>
         <Link href="/archive" className="bg-black text-white px-4 py-2 md:px-5 md:py-2 rounded-full font-bold text-xs md:text-sm hover:bg-gray-800 transition shrink-0">포트폴리오</Link>
       </header>
+      
       <main className="max-w-7xl mx-auto">
         <StockTicker />
+        
+        {/* 💡 [요구사항 2] 거시경제 포털 배지 정렬 순서 업데이트 및 StockAnalysis 추가 완료 */}
         <section className="bg-black text-white rounded-2xl p-6 shadow-lg mb-12">
-          <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-            <li className="flex gap-4 items-center border-b border-gray-900 pb-3 md:pb-4"><span className="text-red-400 font-bold text-xs bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">Global</span><a href="https://www.hankyung.com/globalmarket/global-equity-market" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 글로벌마켓</a></li>
-            <li className="flex gap-4 items-center border-b border-gray-900 pb-3 md:pb-4"><span className="text-amber-400 font-bold text-xs bg-amber-950/50 px-2 py-0.5 rounded border border-amber-900 min-w-[56px] text-center">Cycle</span><a href="https://institutional.fidelity.com/app/item/RD_13569_40890.html" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">경기사이클</a></li>
-            <li className="flex gap-4 items-center border-b md:border-b-0 border-gray-900 pb-3 md:pb-0 pt-1"><span className="text-blue-400 font-bold text-xs bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900 min-w-[56px] text-center">Korea</span><a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 코리안마켓</a></li>
-            <li className="flex gap-4 items-center pt-1"><span className="text-emerald-400 font-bold text-xs bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900 min-w-[56px] text-center">FED</span><a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">FED 점도표</a></li>
+          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+            {/* 1. 한경 글로벌마켓 */}
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+              <span className="text-red-400 font-bold text-xs bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">Global</span>
+              <a href="https://www.hankyung.com/globalmarket/global-equity-market" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 글로벌마켓</a>
+            </li>
+            
+            {/* 2. 한경 코리안마켓 */}
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+              <span className="text-blue-400 font-bold text-xs bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900 min-w-[56px] text-center">Korea</span>
+              <a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 코리안마켓</a>
+            </li>
+            
+            {/* 3. [NEW] Stock Analysis */}
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+              <span className="text-purple-400 font-bold text-xs bg-purple-950/50 px-2 py-0.5 rounded border border-purple-900 min-w-[56px] text-center">Analysis</span>
+              <a href="https://stockanalysis.com/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">StockAnalysis</a>
+            </li>
+            
+            {/* 4. 경기사이클 */}
+            <li className="flex gap-4 items-center border-b lg:border-b-0 border-gray-900 pb-3 lg:pb-0 pt-1">
+              <span className="text-amber-400 font-bold text-xs bg-amber-950/50 px-2 py-0.5 rounded border border-amber-900 min-w-[56px] text-center">Cycle</span>
+              <a href="https://institutional.fidelity.com/app/item/RD_13569_40890.html" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">경기사이클</a>
+            </li>
+            
+            {/* 5. FED 점도표 */}
+            <li className="flex gap-4 items-center pt-1">
+              <span className="text-emerald-400 font-bold text-xs bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900 min-w-[56px] text-center">FED</span>
+              <a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">FED 점도표</a>
+            </li>
           </ul>
         </section>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <NewsCard category="해외증시" /><NewsCard category="국제" /><NewsCard category="기업" />
           <NewsCard category="부동산" /><NewsCard category="경제" /><NewsCard category="금융" />
