@@ -4,11 +4,12 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const symbols = [
-    // 💡 [요구사항 1] 글로벌 증시 6대장 순서 변경 및 러셀2000 추가 완료!
-    { code: '^GSPC', name: 'S&P 500', suffix: '' },
-    { code: '^IXIC', name: 'NASDAQ', suffix: '' },
-    { code: '^DJI', name: 'DOW JONES', suffix: '' },
-    { code: '^RUT', name: 'RUSSELL 2000', suffix: '' },
+    // 💡 미국 4대 지수: 선물(Futures) 메인 + 현물(Spot) 서브 듀얼 시스템 복구!
+    { code: 'ES=F', spotCode: '^GSPC', name: 'S&P 500', suffix: '' },
+    { code: 'NQ=F', spotCode: '^IXIC', name: 'NASDAQ', suffix: '' },
+    { code: 'YM=F', spotCode: '^DJI', name: 'DOW JONES', suffix: '' },
+    { code: 'RTY=F', spotCode: '^RUT', name: 'RUSSELL 2000', suffix: '' },
+    // 한국 증시는 현물 단일 지표
     { code: '^KS11', name: 'KOSPI', suffix: '' },
     { code: '^KQ11', name: 'KOSDAQ', suffix: '' },
     
@@ -23,6 +24,7 @@ export async function GET() {
 
   try {
     const results = await Promise.all(symbols.map(async (item) => {
+      // 1. 메인 지표 (선물 혹은 단일) 파싱
       const res = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.code}?interval=1m&range=1d`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Fetch failed');
       const data = await res.json();
@@ -30,9 +32,28 @@ export async function GET() {
       const price = meta.regularMarketPrice;
       const prev = meta.previousClose;
       const change = ((price - prev) / prev) * 100;
-      
-      // 💡 [요구사항 2] 포인트/금액 절대 등락 수치 도출
-      const changeAmt = price - prev;
+      const changeAmt = price - prev; // 절대 등락 수치
+
+      let spotChangeStr = null;
+      let isSpotUp = null;
+
+      // 2. 현물(Spot) 지표가 있는 경우 듀얼 파싱 실행
+      if (item.spotCode) {
+        try {
+          const spotRes = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.spotCode}?interval=1m&range=1d`, { cache: 'no-store' });
+          if (spotRes.ok) {
+            const spotData = await spotRes.json();
+            const spotMeta = spotData.chart.result[0].meta;
+            const spotPrice = spotMeta.regularMarketPrice;
+            const spotPrev = spotMeta.previousClose;
+            const spotChange = ((spotPrice - spotPrev) / spotPrev) * 100;
+            spotChangeStr = Math.abs(spotChange).toFixed(2) + '%';
+            isSpotUp = spotChange >= 0;
+          }
+        } catch (e) {
+          console.error(`Spot fetch error for ${item.spotCode}`, e);
+        }
+      }
 
       return {
         name: item.name,
@@ -40,7 +61,9 @@ export async function GET() {
         change: Math.abs(change).toFixed(2) + '%',
         changeAmt: Math.abs(changeAmt).toLocaleString('ko-KR', { maximumFractionDigits: 2 }),
         isUp: change >= 0,
-        suffix: item.suffix
+        suffix: item.suffix,
+        spotChange: spotChangeStr, // 💡 현물 등락률 탑재
+        isSpotUp: isSpotUp
       };
     }));
     return NextResponse.json(results);
