@@ -63,9 +63,8 @@ function StockTicker() {
 
   useEffect(() => { fetchStocks(); }, []);
 
-  const defaultStocks = Array(6).fill({ name: '-', value: '-', change: '-', isUp: null });
-  // 💡 매크로 지표가 6개로 늘어났으므로 기본 배열 크기 증가
-  const defaultMacros = Array(6).fill({ name: '-', value: '-', change: '-', isUp: null });
+  const defaultStocks = Array(6).fill({ name: '-', value: '-', change: '-', changeAmt: '0', isUp: null });
+  const defaultMacros = Array(6).fill({ name: '-', value: '-', change: '-', changeAmt: '0', isUp: null });
 
   const line1Stocks = liveData && liveData.length >= 6 ? liveData.slice(0, 6) : defaultStocks;
   const line2Macros = liveData && liveData.length >= 6 ? liveData.slice(6) : defaultMacros;
@@ -81,7 +80,10 @@ function StockTicker() {
           <div className="flex items-center gap-0.5 md:gap-1 leading-none">
             {item.isUp === true && <svg className="w-3 h-3 md:w-4 md:h-4 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
             {item.isUp === false && <svg className="w-3 h-3 md:w-4 md:h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
-            <span className={`text-xs md:text-sm font-semibold ${item.isUp === true ? 'text-pink-600' : item.isUp === false ? 'text-blue-500' : 'text-gray-500'}`}>{item.change}</span>
+            {/* 💡 [요구사항 2] 메인 대시보드에도 절대 등락 수치를 혼합 표기했습니다! */}
+            <span className={`text-[10px] md:text-sm font-semibold ${item.isUp === true ? 'text-pink-600' : item.isUp === false ? 'text-blue-500' : 'text-gray-500'}`}>
+              {item.changeAmt && `${item.changeAmt} `}({item.change})
+            </span>
           </div>
         </div>
       </div>
@@ -102,7 +104,6 @@ function StockTicker() {
         <div className="bg-slate-700 text-white px-4 py-2 flex justify-between items-center">
           <h2 className="text-lg font-bold tracking-tight">외환 및 주요 거시경제 지표 (실시간)</h2>
         </div>
-        {/* 💡 지표가 6개이므로 데스크톱 환경에서 lg:grid-cols-6 로 예쁘게 펴지게 수정 */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6">{line2Macros.map((macro, index) => renderItem(macro, index))}</div>
       </div>
     </section>
