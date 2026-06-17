@@ -1,9 +1,7 @@
 export const dynamic = 'force-dynamic';
-
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  // 💡 [초대형 업데이트] 각 ETF별 배당률(div)과 연평균 수익률(cagr) 데이터 전면 탑재!
   const masterPool = {
     '360200': { name: 'ACE 미국S&P500', symbol: '360200.KS', sectors: { tech: 31, finance: 13, health: 12, consumer_cyc: 10, ind: 9, communication: 8, consumer_def: 6, energy: 4, utilities: 3, basic: 2, realestate: 2 }, sizes: { large: 86, mid: 13, small: 1 }, styles: { value: 25, blend: 45, growth: 30 }, div: 1.3, cagr: { '1y': 25, '3y': 10, '5y': 14 } },
     '360750': { name: 'ACE 미국나스닥100', symbol: '360750.KS', sectors: { tech: 51, finance: 1, health: 6, consumer_cyc: 13, ind: 5, communication: 15, consumer_def: 6, energy: 0, utilities: 1, basic: 1, realestate: 1 }, sizes: { large: 96, mid: 4, small: 0 }, styles: { value: 5, blend: 25, growth: 70 }, div: 0.6, cagr: { '1y': 35, '3y': 12, '5y': 19 } },
@@ -73,15 +71,21 @@ export async function GET() {
           const price = meta.regularMarketPrice;
           const prevClose = meta.previousClose;
           const changeRaw = ((price - prevClose) / prevClose) * 100;
+          // 💡 [패치 2] 절대 등락 금액(원) 계산 로직 추가
+          const changeAmt = price - prevClose; 
+          
           return {
             name: item.name, code: item.code, symbol: item.symbol,
-            value: price.toLocaleString('ko-KR'), change: Math.abs(changeRaw).toFixed(2) + '%', isUp: changeRaw >= 0,
+            value: price.toLocaleString('ko-KR'), 
+            change: Math.abs(changeRaw).toFixed(2) + '%', 
+            changeAmt: Math.abs(changeAmt).toLocaleString('ko-KR', { maximumFractionDigits: 0 }), // 소수점 제거
+            isUp: changeRaw >= 0,
             xray: item.xray
           };
         }
       }
     } catch (e) { console.error(`야후 API 파싱누락 (${item.symbol}):`, e); }
-    return { name: item.name, code: item.code, symbol: item.symbol, value: '-', change: '0.00%', isUp: null, xray: item.xray };
+    return { name: item.name, code: item.code, symbol: item.symbol, value: '-', change: '0.00%', changeAmt: '0', isUp: null, xray: item.xray };
   };
 
   try {

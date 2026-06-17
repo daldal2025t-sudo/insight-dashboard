@@ -120,7 +120,6 @@ export default function ArchivePage() {
       totalPortfolioValue += evalValue;
       if (foundData && foundData.xray) {
         if(foundData.xray.div) totalAnnualDividend += evalValue * (foundData.xray.div / 100);
-
         Object.keys(sectorTotals).forEach(k => { sectorTotals[k] += evalValue * ((foundData.xray.sectors?.[k] || 0) / 100); });
         Object.keys(sizeTotals).forEach(k => { sizeTotals[k] += evalValue * ((foundData.xray.sizes?.[k] || 0) / 100); });
         Object.keys(styleTotals).forEach(k => { styleTotals[k] += evalValue * ((foundData.xray.styles?.[k] || 0) / 100); });
@@ -130,7 +129,9 @@ export default function ArchivePage() {
     return {
       code: config.code, targetWeight: config.weight,
       name: foundData ? foundData.name : '마스터 데이터 동기화 중',
-      value: foundData ? foundData.value : '-', change: foundData ? foundData.change : '0.00%', isUp: foundData ? foundData.isUp : null,
+      value: foundData ? foundData.value : '-', change: foundData ? foundData.change : '0.00%', 
+      changeAmt: foundData ? foundData.changeAmt : '0', // 💡 절대 등락 추가
+      isUp: foundData ? foundData.isUp : null,
       qty, evalValue, xray: foundData ? foundData.xray : null
     };
   });
@@ -150,7 +151,6 @@ export default function ArchivePage() {
   }
 
   const getPercentage = (subValue) => totalPortfolioValue > 0 ? (subValue / totalPortfolioValue) * 100 : 0;
-
   const pieChartData = finalMappedItems.filter(item => item.realWeight > 0).map(item => ({ name: item.name, value: item.realWeight }));
   const PIE_COLORS = ['#4f46e5', '#ec4899', '#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#64748b'];
 
@@ -281,13 +281,11 @@ export default function ArchivePage() {
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-indigo-100 rounded-2xl p-6 shadow-sm">
                 <h2 className="text-xl font-black text-indigo-900 mb-2 flex items-center gap-2">📈 과거 수익률 기반 백테스팅 (5년 시뮬레이션)</h2>
                 <p className="text-xs text-gray-500 font-semibold mb-6">※ 현재 포트폴리오 비중을 유지했을 때의 과거 데이터를 기반으로 한 향후 5년 추정 자산 성장 곡선입니다.</p>
-                
                 <div className="grid grid-cols-3 gap-4 mb-8">
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">1년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr1y.toFixed(1)}%</p></div>
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">3년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr3y.toFixed(1)}%</p></div>
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">5년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr5y.toFixed(1)}%</p></div>
                 </div>
-
                 {totalPortfolioValue > 0 ? (
                   <div className="h-[300px] w-full bg-white p-4 rounded-xl shadow-sm border border-indigo-50">
                     <ResponsiveContainer width="100%" height="100%">
@@ -344,7 +342,6 @@ export default function ArchivePage() {
                   <button onClick={() => setCyclePhase('recession')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'recession' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>❄️ 4. 침체 국면</button>
                 </div>
               </div>
-
               {totalPortfolioValue === 0 ? (
                 <div className="bg-white rounded-2xl p-8 border border-gray-100 text-center font-bold text-gray-400 text-sm shadow-sm">
                   [📊 보유 비중 체크] 탭에서 수량을 먼저 입력해 주셔야 매크로 스튜디오 카드가 활성화됩니다!
@@ -355,7 +352,6 @@ export default function ArchivePage() {
                     <span className="text-[10px] tracking-widest font-black text-teal-400 uppercase">Fidelity Macro Analysis Dashboard</span>
                     <h2 className="text-lg md:text-xl font-black">🎯 {currentCycleData.title} 진단 보고서</h2>
                   </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
                       <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
@@ -382,7 +378,6 @@ export default function ArchivePage() {
                         })}
                       </div>
                     </div>
-
                     <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
                       <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
                         <h3 className="font-black text-gray-900 text-base flex items-center gap-1.5 text-red-500">🔴 비중 축소 권고 (Underweight)</h3>
@@ -409,7 +404,6 @@ export default function ArchivePage() {
                       </div>
                     </div>
                   </div>
-
                   {currentCycleData.recommend.some(sec => sec.target - sec.current > 0) && (
                     <div className="bg-indigo-50 rounded-2xl p-4 md:p-6 shadow-sm border border-indigo-100 mt-2">
                       <div className="flex justify-between items-center border-b border-indigo-200 pb-3 mb-4">
@@ -447,7 +441,6 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {/* 💡 [수정] 모바일 화면에서 잘리지 않도록 리스트 제어 및 도넛 차트 컬러 패치! */}
           {!['dividend', 'backtest', 'rebalance'].includes(activeTab) && (
             <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
               <div className="grid grid-cols-12 text-[10px] md:text-xs font-bold text-gray-400 border-b border-gray-100 pb-3 mb-3 px-2">
@@ -472,7 +465,6 @@ export default function ArchivePage() {
                             <button onClick={() => handleRemoveStockFromTab(activeTab, etf.code)} className="text-gray-300 hover:text-red-500 text-xs font-bold transition shrink-0 p-1">✕</button>
                           )}
                           <div className="flex flex-col justify-center min-w-0 gap-0.5">
-                            {/* 💡 [패치 1] 모바일에서 풀네임이 잘리지 않도록 글씨 크기를 11px로 줄이고 줄바꿈을 허용했습니다. */}
                             <p className="font-bold text-gray-900 text-[11px] md:text-sm leading-tight break-keep">{etf.name}</p>
                             <p className="text-[9px] md:text-[11px] text-gray-400 font-medium leading-none">ETF {etf.code}</p>
                           </div>
@@ -487,7 +479,8 @@ export default function ArchivePage() {
                                 <button onClick={() => handleMoveOrder(activeTab, index, 'up')} disabled={index === 0} className="hover:text-black disabled:opacity-20 leading-none py-0.5">▲</button>
                                 <button onClick={() => handleMoveOrder(activeTab, index, 'down')} disabled={index === finalMappedItems.length - 1} className="hover:text-black disabled:opacity-20 leading-none py-0.5">▼</button>
                               </div>
-                              <input type="text" value={etf.targetWeight || '0%'} onChange={(e) => handleWeightChange(activeTab, etf.code, e.target.value)} className="w-12 md:w-14 border border-gray-200 rounded text-center text-xs font-bold bg-slate-50 text-blue-600 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none py-0.5" />
+                              {/* 💡 [패치 2] 비중(%) 입력칸 크기를 w-10 텍스트 10px 로 축소 완료! */}
+                              <input type="text" value={etf.targetWeight || '0%'} onChange={(e) => handleWeightChange(activeTab, etf.code, e.target.value)} className="w-10 md:w-11 border border-gray-200 rounded text-center text-[10px] md:text-[11px] font-bold bg-slate-50 text-blue-600 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none py-0 m-0 leading-none h-5" />
                             </div>
                           )}
                         </div>
@@ -495,7 +488,6 @@ export default function ArchivePage() {
                         <div className="col-span-4 flex flex-col items-end justify-center h-full gap-0.5">
                           {activeTab === 'checker' ? (
                             <>
-                              {/* 💡 [패치 1] 숫자 폰트 크기도 살짝 압축하여 공간을 확보했습니다. */}
                               <span className="text-xs md:text-sm font-extrabold text-gray-900 tracking-tight leading-none text-right break-all">{etf.evalValue.toLocaleString('ko-KR')}<span className="text-[9px] md:text-[10px] font-normal text-gray-400 ml-0.5">원</span></span>
                               <div className="flex items-center">
                                 <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-1.5 py-[1px] rounded tracking-tighter leading-none">{etf.realWeight.toFixed(1)}%</span>
@@ -507,7 +499,10 @@ export default function ArchivePage() {
                               <div className="flex items-center gap-0.5 text-[9px] md:text-xs font-bold leading-none mt-0.5">
                                 {etf.isUp === true && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
                                 {etf.isUp === false && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
-                                <span className={etf.isUp === true ? 'text-pink-600' : etf.isUp === false ? 'text-blue-500' : 'text-gray-500'}>{etf.change}</span>
+                                {/* 💡 [패치 2] 절대 등락 수치(원) + 기존 등락률(%) 혼합 표기 반영! */}
+                                <span className={etf.isUp === true ? 'text-pink-600' : etf.isUp === false ? 'text-blue-500' : 'text-gray-500'}>
+                                  {etf.changeAmt}원 ({etf.change})
+                                </span>
                               </div>
                             </>
                           )}
@@ -522,31 +517,28 @@ export default function ArchivePage() {
 
           {activeTab === 'checker' && totalPortfolioValue > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 transition-all duration-500">
-              
               <div className="md:col-span-2 bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
                 <h3 className="font-extrabold text-gray-900 text-sm md:text-base border-b border-gray-50 pb-2 mb-4">🍩 내 포트폴리오 종목 비중 (Donut Chart)</h3>
                 <div className="h-[250px] md:h-[350px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
+                      {/* 💡 [패치 1] 도넛 차트 폰트 사이즈를 9px로 줄여 아주 정갈하게 표현했습니다. */}
                       <Pie 
-                        data={pieChartData} 
-                        cx="50%" 
-                        cy="50%" 
-                        innerRadius="55%" 
-                        outerRadius="75%" 
-                        paddingAngle={5} 
-                        dataKey="value" 
-                        stroke="none" 
+                        data={pieChartData} cx="50%" cy="50%" innerRadius="55%" outerRadius="75%" paddingAngle={5} dataKey="value" stroke="none" 
                         label={({ name, percent }) => `${name.replace(/미국|KODEX|TIGER|ACE|SOL|KBSTAR|PLUS|HANARO|\(H\)|합성/g, '').trim()} ${(percent * 100).toFixed(1)}%`} 
-                        labelLine={true} 
+                        labelLine={true} style={{ fontSize: '9px', fontWeight: 'bold' }}
                       >
-                        {/* 💡 [패치 2] Tailwind의 기본 회색 덮어쓰기를 원천 차단하기 위해 style={{ fill: color }}를 인라인으로 강제 주입! */}
                         {pieChartData.map((entry, index) => {
                           const color = PIE_COLORS[index % PIE_COLORS.length];
                           return <Cell key={`cell-${index}`} fill={color} style={{ fill: color, outline: 'none' }} />;
                         })}
                       </Pie>
-                      <RechartsTooltip formatter={(value) => value.toFixed(1) + '%'} />
+                      {/* 💡 [패치 1] 마우스 오버(툴팁) 폰트 사이즈도 11px로 줄여 예쁘게 압축! */}
+                      <RechartsTooltip 
+                        wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} 
+                        itemStyle={{ color: '#334155' }} 
+                        formatter={(value) => value.toFixed(1) + '%'} 
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
