@@ -10,6 +10,9 @@ export default function ArchivePage() {
   const [cyclePhase, setCyclePhase] = useState('mid'); 
   const [editModelTarget, setEditModelTarget] = useState('aggressive');
 
+  // 💡 [체크리스트 상태 관리] 카테고리(stockType)를 없애고 9개 문항으로 대폭 확장!
+  const [checks, setChecks] = useState({ q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false, q8: false, q9: false });
+
   const [tabLists, setTabLists] = useState({
     myassets: [],
     aggressive: [{ code: '449190', weight: '65%' }, { code: '0046Y0', weight: '25%' }, { code: '280930', weight: '10%' }],
@@ -48,7 +51,7 @@ export default function ArchivePage() {
   };
 
   const handleAddStockToTab = (code) => {
-    if (['checker', 'rebalance', 'dividend', 'backtest'].includes(activeTab)) return;
+    if (['checker', 'rebalance', 'dividend', 'backtest', 'checklist'].includes(activeTab)) return;
     const targetTab = activeTab === 'models' ? editModelTarget : activeTab;
     const isExist = tabLists[targetTab].some(item => item.code === code);
     if (isExist) return;
@@ -306,6 +309,23 @@ export default function ArchivePage() {
     );
   };
 
+  // 💡 [체크리스트 9대 문항 데이터 베이스]
+  const checklistData = [
+    { id: 'q1', title: "1. 매출 안정성 및 성장률 점검 (Income Statement)", desc: "수년간 매출이 꾸준히 증가하고 있나요? (💡대형우량주: 우상향 안정성 / 💡고성장주: 연 20~25% 이상 / 💡경기순환주: 사이클상 저점 확인)" },
+    { id: 'q2', title: "2. 애널리스트 의견 비율 (Recommendation Trends)", desc: "다수의 애널리스트가 'Buy(매수)' 이상을 유지하며, 'Sell(매도)' 의견이 지배적이지 않음을 확인하셨나요?" },
+    { id: 'q3', title: "3. 향후 예상 실적 추이 (Financial Forecast)", desc: "향후 1~2년간 꾸준한 실적 성장이 예측되고, 시장의 실적 전망치가 계속 상향 조정 중인가요?" },
+    { id: 'q4', title: "4. 역사적 PER 수준 (Price to Earnings Ratio)", desc: "기업의 역사적인 PER 밴드를 확인했을 때, 현재 주가가 과거 대비 극단적인 고평가(슈팅) 상태가 아님을 확인하셨나요?" },
+    { id: 'q5', title: "5. 배당수익률 및 PEG 확인 (Dividend & PEG)", desc: "💡배당주: 현재 배당수익률이 역사적으로 매력적이고 배당컷 위험이 없나요? / 💡성장주: 이익 성장률 대비 주가(PEG)가 합리적인가요?" },
+    { id: 'q6', title: "6. 애널리스트 목표주가 괴리율 (Target Price)", desc: "글로벌 투자 플랫폼에서 제공하는 애널리스트 목표주가 컨센서스 대비 현재 주가의 상방 여력이 충분한지 점검하셨나요?" },
+    { id: 'q7', title: "7. 벤저민 그레이엄 내재가치 밸류에이션", desc: "벤저민 그레이엄의 적정 주가 공식 등을 활용해, 현재 기업의 내재가치 대비 시장 가격이 턱없이 비싸지 않은지 점검하셨나요?" },
+    { id: 'q8', title: "8. ROE (자기자본이익률) 지속성 점검", desc: "최근 10년간 ROE가 평균 15% 이상을 유지하여, 경영진이 주주 자본을 효과적으로 불려왔는지 확인하셨나요?" },
+    { id: 'q9', title: "9. ROIC (투하자본이익률) 적정성 점검", desc: "ROIC가 10~15% 이상을 지속적으로 유지하며, 기업이 영업을 위해 투입한 자본 대비 훌륭한 이익을 창출해내는지 점검하셨나요?" }
+  ];
+
+  // 💡 [점수 계산 로직] 9문항 기준 100점 만점 환산
+  const checkedCount = Object.values(checks).filter(Boolean).length;
+  const score = Math.round((checkedCount / 9) * 100);
+
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans pb-24">
       <header className="max-w-5xl mx-auto mb-8 flex justify-between items-center border-b border-gray-200 pb-6">
@@ -321,9 +341,55 @@ export default function ArchivePage() {
           <button onClick={() => setActiveTab('dividend')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'dividend' ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💸 배당/수익</button>
           <button onClick={() => setActiveTab('backtest')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'backtest' ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📈 과거 수익률</button>
           <button onClick={() => setActiveTab('rebalance')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'rebalance' ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔄 리밸런싱</button>
+          <button onClick={() => setActiveTab('checklist')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'checklist' ? 'bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>✅ 종목 진단</button>
         </div>
 
         <section className="flex flex-col gap-6">
+          {/* 💡 [요구사항] 종목 진단 탭 - 9대 체크리스트 통합 UI 렌더링 */}
+          {activeTab === 'checklist' && (
+            <div className="flex flex-col gap-6">
+              
+              <div className="bg-gradient-to-r from-indigo-900 to-blue-900 text-white p-5 md:p-6 rounded-2xl shadow-sm flex flex-col gap-2">
+                <span className="text-[10px] tracking-widest font-black text-blue-300 uppercase">Fundamental Master Analysis</span>
+                <h2 className="text-xl md:text-2xl font-black">🚩 100배주 발굴 9대 매수 체크리스트</h2>
+                <p className="text-xs md:text-sm text-blue-100 opacity-80 mt-1">개별 주식 매수 전, 9가지 필수 펀더멘털 지표를 단 한 장으로 점검하세요.</p>
+              </div>
+
+              <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
+                {checklistData.map((item, index) => (
+                  <label key={item.id} className={`flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl border cursor-pointer transition ${checks[item.id] ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-transparent hover:bg-gray-100'}`}>
+                    <input type="checkbox" checked={checks[item.id]} onChange={(e) => setChecks({...checks, [item.id]: e.target.checked})} className="mt-1 w-5 h-5 accent-indigo-600 shrink-0 cursor-pointer" />
+                    <div className="flex flex-col">
+                      <span className={`text-sm md:text-base font-bold transition ${checks[item.id] ? 'text-indigo-900' : 'text-gray-800'}`}>{item.title}</span>
+                      <span className="text-[11px] md:text-xs text-gray-500 mt-1 leading-relaxed break-keep">{item.desc}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              {/* 진단 결과 패널 */}
+              <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-md text-white flex flex-col items-center justify-center text-center gap-3">
+                <span className="text-xs md:text-sm font-bold text-gray-400">펀더멘털 진단 종합 점수</span>
+                <div className="text-4xl md:text-5xl font-black mb-2 flex items-center gap-2">
+                  {score === 100 && <span className="text-emerald-400">🟢 100점 (적극 매수)</span>}
+                  {score >= 75 && score < 100 && <span className="text-blue-400">🔵 {score}점 (긍정 검토)</span>}
+                  {score >= 50 && score < 75 && <span className="text-amber-400">🟡 {score}점 (추가 조사)</span>}
+                  {score < 50 && <span className="text-red-400">🔴 {score}점 (매수 위험)</span>}
+                </div>
+                <div className="w-full max-w-md bg-slate-600 h-3 md:h-4 rounded-full overflow-hidden shadow-inner">
+                  <div className={`h-full transition-all duration-500 ${score === 100 ? 'bg-emerald-400' : score >= 75 ? 'bg-blue-400' : score >= 50 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${score}%` }}></div>
+                </div>
+                <p className="text-xs md:text-sm text-slate-300 mt-3 font-semibold break-keep">
+                  {score === 100 && "🔥 모든 펀더멘털 기준을 완벽하게 통과했습니다! 시장을 이길 100배주 후보입니다."}
+                  {score >= 75 && score < 100 && "상당히 우수한 기업입니다. 체크되지 않은 1~2개 항목의 리스크를 확인 후 매수하세요."}
+                  {score >= 50 && score < 75 && "절반의 기준만 통과했습니다. 아직 투자하기엔 확신이 부족한 상태입니다."}
+                  {score < 50 && "치명적인 리스크가 많습니다. 소중한 자산을 보호하기 위해 매수를 보류하세요."}
+                </p>
+              </div>
+
+            </div>
+          )}
+
           {isCalculationRequired && (
             <div className="bg-black text-white p-6 rounded-2xl shadow-md flex justify-between items-center">
               <div><p className="text-gray-400 text-xs font-bold tracking-wider">TOTAL PORTFOLIO ASSETS</p><p className="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">{totalPortfolioValue.toLocaleString('ko-KR')}<span className="text-sm font-normal text-gray-400 ml-1">원</span></p></div>
@@ -513,7 +579,7 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {!['dividend', 'backtest', 'rebalance'].includes(activeTab) && (
+          {!['dividend', 'backtest', 'rebalance', 'checklist'].includes(activeTab) && (
             <>
               {isLoading ? (
                 <div className="text-center py-12 text-gray-400 font-bold text-sm">마스터 데이터 파싱 엔진 동기화 중... ⏳</div>
@@ -540,7 +606,6 @@ export default function ArchivePage() {
                 <div className="h-[250px] md:h-[350px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      {/* 💡 [패치] 폰트는 다시 9px로 선명하게, 바깥 크기(outerRadius)는 65%로 키워서 밸런스 조정 완료! */}
                       <Pie 
                         data={pieChartData} 
                         cx="50%" 
