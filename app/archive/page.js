@@ -540,19 +540,19 @@ export default function ArchivePage() {
                 <div className="h-[250px] md:h-[350px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      {/* 💡 [패치 1] 도넛의 크기(outerRadius)를 55%로 대폭 줄이고 폰트 크기를 8px로 설정하여 여백 공간을 확보했습니다! */}
+                      {/* 💡 [패치] 폰트는 다시 9px로 선명하게, 바깥 크기(outerRadius)는 65%로 키워서 밸런스 조정 완료! */}
                       <Pie 
                         data={pieChartData} 
                         cx="50%" 
                         cy="50%" 
-                        innerRadius="40%" 
-                        outerRadius="55%" 
+                        innerRadius="45%" 
+                        outerRadius="65%" 
                         paddingAngle={5} 
                         dataKey="value" 
                         stroke="none" 
                         labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
                         label={({ name, percent, x, y, textAnchor }) => (
-                          <text x={x} y={y} fill="#475569" textAnchor={textAnchor} dominantBaseline="central" fontSize={8} fontWeight="bold" letterSpacing="-0.5px">
+                          <text x={x} y={y} fill="#475569" textAnchor={textAnchor} dominantBaseline="central" fontSize={9} fontWeight="bold" letterSpacing="-0.5px">
                             {`${name.replace(/미국|KODEX|TIGER|ACE|SOL|KBSTAR|PLUS|HANARO|\(H\)|합성/g, '').trim()} ${(percent * 100).toFixed(1)}%`}
                           </text>
                         )}
