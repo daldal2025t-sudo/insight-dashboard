@@ -176,10 +176,8 @@ export default function ArchivePage() {
   const weightedCagr1y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['1y'] || 0) * (item.realWeight / 100), 0);
   const weightedCagr3y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['3y'] || 0) * (item.realWeight / 100), 0);
   const weightedCagr5y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['5y'] || 0) * (item.realWeight / 100), 0);
-  // 💡 [요구사항] 10년 연평균 수익률 산출 로직 추가
   const weightedCagr10y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['10y'] || 0) * (item.realWeight / 100), 0);
   
-  // 💡 [요구사항] 10년 차트 시뮬레이션 확장 (5년 -> 10년)
   const backtestData = [];
   if (totalPortfolioValue > 0) {
     for (let year = 0; year <= 10; year++) {
@@ -321,7 +319,6 @@ export default function ArchivePage() {
           <button onClick={() => setActiveTab('models')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'models' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📚 모델 포트폴리오</button>
           <button onClick={() => setActiveTab('checker')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'checker' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📊 보유 비중</button>
           <button onClick={() => setActiveTab('dividend')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'dividend' ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💸 배당/수익</button>
-          {/* 💡 [요구사항 1] 버튼 명칭 직관화 완료 */}
           <button onClick={() => setActiveTab('backtest')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'backtest' ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📈 과거 수익률</button>
           <button onClick={() => setActiveTab('rebalance')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'rebalance' ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔄 리밸런싱</button>
         </div>
@@ -350,25 +347,23 @@ export default function ArchivePage() {
           {activeTab === 'backtest' && (
             <div className="flex flex-col gap-6">
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-indigo-100 rounded-2xl p-6 shadow-sm">
-                {/* 💡 [요구사항 1] 타이틀 및 텍스트 10년 기준으로 업데이트 완료 */}
                 <h2 className="text-xl font-black text-indigo-900 mb-2 flex items-center gap-2">📈 과거 수익률 기반 (10년 시뮬레이션)</h2>
                 <p className="text-xs text-gray-500 font-semibold mb-6">※ 현재 포트폴리오 비중을 유지했을 때의 과거 데이터를 기반으로 한 향후 10년 추정 자산 성장 곡선입니다.</p>
-                
-                {/* 💡 [요구사항 1] 10년 연평균 수익률 패널 추가 (그리드 4분할 반영) */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">1년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr1y.toFixed(1)}%</p></div>
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">3년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr3y.toFixed(1)}%</p></div>
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">5년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr5y.toFixed(1)}%</p></div>
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">10년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr10y.toFixed(1)}%</p></div>
                 </div>
-
                 {totalPortfolioValue > 0 ? (
                   <div className="h-[300px] w-full bg-white p-4 rounded-xl shadow-sm border border-indigo-50">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={backtestData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#64748b', fontWeight: 'bold' }} />
-                        <YAxis tickFormatter={(val) => (val/10000).toLocaleString() + '만'} tick={{ fontSize: 10, fill: '#64748b' }} width={60} />
+                        {/* 💡 [패치 2] X축 폰트 크기를 12px -> 9px로 다이어트 완료! */}
+                        <XAxis dataKey="year" tick={{ fontSize: 9, fill: '#64748b', fontWeight: 'bold' }} />
+                        {/* 💡 [패치 2] Y축 폰트 크기도 10px -> 9px, 여백(width)은 50으로 조절 완료! */}
+                        <YAxis tickFormatter={(val) => (val/10000).toLocaleString() + '만'} tick={{ fontSize: 9, fill: '#64748b' }} width={50} />
                         <RechartsTooltip formatter={(value) => value.toLocaleString('ko-KR') + '원'} labelStyle={{ fontWeight: 'bold', color: '#334155' }} />
                         <Line type="monotone" dataKey="예상 자산(원)" stroke="#4f46e5" strokeWidth={4} dot={{ r: 4, fill: '#4f46e5' }} activeDot={{ r: 8 }} />
                       </LineChart>
@@ -547,10 +542,11 @@ export default function ArchivePage() {
                 <div className="h-[250px] md:h-[350px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
+                      {/* 💡 [패치 1] 글자 크기를 8px로 초압축하고, 차트의 크기(outerRadius)를 줄여 여백을 넉넉하게 줬습니다! */}
                       <Pie 
-                        data={pieChartData} cx="50%" cy="50%" innerRadius="55%" outerRadius="75%" paddingAngle={5} dataKey="value" stroke="none" 
+                        data={pieChartData} cx="50%" cy="50%" innerRadius="50%" outerRadius="65%" paddingAngle={5} dataKey="value" stroke="none" 
                         label={({ name, percent }) => `${name.replace(/미국|KODEX|TIGER|ACE|SOL|KBSTAR|PLUS|HANARO|\(H\)|합성/g, '').trim()} ${(percent * 100).toFixed(1)}%`} 
-                        labelLine={true} style={{ fontSize: '9px', fontWeight: 'bold' }}
+                        labelLine={true} style={{ fontSize: '8px', fontWeight: '600' }}
                       >
                         {pieChartData.map((entry, index) => {
                           const color = PIE_COLORS[index % PIE_COLORS.length];
