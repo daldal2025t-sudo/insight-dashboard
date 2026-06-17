@@ -360,9 +360,7 @@ export default function ArchivePage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={backtestData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        {/* 💡 [패치 2] X축 폰트 크기를 12px -> 9px로 다이어트 완료! */}
                         <XAxis dataKey="year" tick={{ fontSize: 9, fill: '#64748b', fontWeight: 'bold' }} />
-                        {/* 💡 [패치 2] Y축 폰트 크기도 10px -> 9px, 여백(width)은 50으로 조절 완료! */}
                         <YAxis tickFormatter={(val) => (val/10000).toLocaleString() + '만'} tick={{ fontSize: 9, fill: '#64748b' }} width={50} />
                         <RechartsTooltip formatter={(value) => value.toLocaleString('ko-KR') + '원'} labelStyle={{ fontWeight: 'bold', color: '#334155' }} />
                         <Line type="monotone" dataKey="예상 자산(원)" stroke="#4f46e5" strokeWidth={4} dot={{ r: 4, fill: '#4f46e5' }} activeDot={{ r: 8 }} />
@@ -542,11 +540,22 @@ export default function ArchivePage() {
                 <div className="h-[250px] md:h-[350px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      {/* 💡 [패치 1] 글자 크기를 8px로 초압축하고, 차트의 크기(outerRadius)를 줄여 여백을 넉넉하게 줬습니다! */}
+                      {/* 💡 [패치 1] 도넛의 크기(outerRadius)를 55%로 대폭 줄이고 폰트 크기를 8px로 설정하여 여백 공간을 확보했습니다! */}
                       <Pie 
-                        data={pieChartData} cx="50%" cy="50%" innerRadius="50%" outerRadius="65%" paddingAngle={5} dataKey="value" stroke="none" 
-                        label={({ name, percent }) => `${name.replace(/미국|KODEX|TIGER|ACE|SOL|KBSTAR|PLUS|HANARO|\(H\)|합성/g, '').trim()} ${(percent * 100).toFixed(1)}%`} 
-                        labelLine={true} style={{ fontSize: '8px', fontWeight: '600' }}
+                        data={pieChartData} 
+                        cx="50%" 
+                        cy="50%" 
+                        innerRadius="40%" 
+                        outerRadius="55%" 
+                        paddingAngle={5} 
+                        dataKey="value" 
+                        stroke="none" 
+                        labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
+                        label={({ name, percent, x, y, textAnchor }) => (
+                          <text x={x} y={y} fill="#475569" textAnchor={textAnchor} dominantBaseline="central" fontSize={8} fontWeight="bold" letterSpacing="-0.5px">
+                            {`${name.replace(/미국|KODEX|TIGER|ACE|SOL|KBSTAR|PLUS|HANARO|\(H\)|합성/g, '').trim()} ${(percent * 100).toFixed(1)}%`}
+                          </text>
+                        )}
                       >
                         {pieChartData.map((entry, index) => {
                           const color = PIE_COLORS[index % PIE_COLORS.length];
