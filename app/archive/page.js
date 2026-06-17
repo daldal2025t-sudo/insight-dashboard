@@ -8,7 +8,6 @@ export default function ArchivePage() {
   const [masterPool, setMasterPool] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [cyclePhase, setCyclePhase] = useState('mid'); 
-  // 💡 모델 탭 통합에 따라, 검색창에서 편입할 때 어떤 모델에 추가할지 선택하는 상태입니다.
   const [editModelTarget, setEditModelTarget] = useState('aggressive');
 
   const [tabLists, setTabLists] = useState({
@@ -48,7 +47,6 @@ export default function ArchivePage() {
     localStorage.setItem('kijay_etf_counts_v2', JSON.stringify(updated));
   };
 
-  // 💡 검색 추가 시 모델 탭이면 라디오버튼 타겟에 추가하도록 로직 변경
   const handleAddStockToTab = (code) => {
     if (['checker', 'rebalance', 'dividend', 'backtest'].includes(activeTab)) return;
     const targetTab = activeTab === 'models' ? editModelTarget : activeTab;
@@ -113,7 +111,6 @@ export default function ArchivePage() {
 
   const isCalculationRequired = ['checker', 'rebalance', 'dividend', 'backtest'].includes(activeTab);
 
-  // 💡 리스트 공통 변환 함수 (통합 탭 렌더링용)
   const getMappedItems = (tabKey) => {
     return tabLists[tabKey].map(config => {
       const foundData = masterPool.find(p => p.code === config.code);
@@ -179,13 +176,16 @@ export default function ArchivePage() {
   const weightedCagr1y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['1y'] || 0) * (item.realWeight / 100), 0);
   const weightedCagr3y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['3y'] || 0) * (item.realWeight / 100), 0);
   const weightedCagr5y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['5y'] || 0) * (item.realWeight / 100), 0);
+  // 💡 [요구사항] 10년 연평균 수익률 산출 로직 추가
+  const weightedCagr10y = finalMappedItems.reduce((acc, item) => acc + (item.xray?.cagr?.['10y'] || 0) * (item.realWeight / 100), 0);
   
+  // 💡 [요구사항] 10년 차트 시뮬레이션 확장 (5년 -> 10년)
   const backtestData = [];
   if (totalPortfolioValue > 0) {
-    for (let year = 0; year <= 5; year++) {
+    for (let year = 0; year <= 10; year++) {
       backtestData.push({
         year: `${year}년 후`,
-        "예상 자산(원)": Math.round(totalPortfolioValue * Math.pow(1 + weightedCagr5y / 100, year))
+        "예상 자산(원)": Math.round(totalPortfolioValue * Math.pow(1 + weightedCagr10y / 100, year))
       });
     }
   }
@@ -245,7 +245,6 @@ export default function ArchivePage() {
     </div>
   );
 
-  // 💡 리스트 공통 렌더러 함수 (코드 중복을 막고 모델 탭에서 3개 동시 출력을 지원)
   const renderTable = (items, tabKeyForEdit, titleStr) => {
     const isChecker = tabKeyForEdit === 'checker';
     return (
@@ -317,13 +316,13 @@ export default function ArchivePage() {
       </header>
 
       <main className="max-w-5xl mx-auto">
-        {/* 💡 [요구사항 3] 공격/중립/안정을 "모델 포트폴리오" 탭 하나로 묶었습니다! */}
         <div className="flex gap-2 mb-6 bg-gray-200 p-1 rounded-xl w-full overflow-x-auto whitespace-nowrap hide-scrollbar">
           <button onClick={() => setActiveTab('myassets')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'myassets' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💰 내 자산</button>
           <button onClick={() => setActiveTab('models')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'models' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📚 모델 포트폴리오</button>
           <button onClick={() => setActiveTab('checker')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'checker' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📊 보유 비중</button>
           <button onClick={() => setActiveTab('dividend')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'dividend' ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💸 배당/수익</button>
-          <button onClick={() => setActiveTab('backtest')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'backtest' ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📈 백테스팅</button>
+          {/* 💡 [요구사항 1] 버튼 명칭 직관화 완료 */}
+          <button onClick={() => setActiveTab('backtest')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'backtest' ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📈 과거 수익률</button>
           <button onClick={() => setActiveTab('rebalance')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'rebalance' ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔄 리밸런싱</button>
         </div>
 
@@ -351,13 +350,18 @@ export default function ArchivePage() {
           {activeTab === 'backtest' && (
             <div className="flex flex-col gap-6">
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-indigo-100 rounded-2xl p-6 shadow-sm">
-                <h2 className="text-xl font-black text-indigo-900 mb-2 flex items-center gap-2">📈 과거 수익률 기반 백테스팅 (5년 시뮬레이션)</h2>
-                <p className="text-xs text-gray-500 font-semibold mb-6">※ 현재 포트폴리오 비중을 유지했을 때의 과거 데이터를 기반으로 한 향후 5년 추정 자산 성장 곡선입니다.</p>
-                <div className="grid grid-cols-3 gap-4 mb-8">
+                {/* 💡 [요구사항 1] 타이틀 및 텍스트 10년 기준으로 업데이트 완료 */}
+                <h2 className="text-xl font-black text-indigo-900 mb-2 flex items-center gap-2">📈 과거 수익률 기반 (10년 시뮬레이션)</h2>
+                <p className="text-xs text-gray-500 font-semibold mb-6">※ 현재 포트폴리오 비중을 유지했을 때의 과거 데이터를 기반으로 한 향후 10년 추정 자산 성장 곡선입니다.</p>
+                
+                {/* 💡 [요구사항 1] 10년 연평균 수익률 패널 추가 (그리드 4분할 반영) */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">1년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr1y.toFixed(1)}%</p></div>
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">3년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr3y.toFixed(1)}%</p></div>
                   <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">5년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr5y.toFixed(1)}%</p></div>
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 text-center"><p className="text-[10px] md:text-xs font-bold text-gray-400">10년 연평균(CAGR)</p><p className="text-lg md:text-xl font-black text-indigo-600">{weightedCagr10y.toFixed(1)}%</p></div>
                 </div>
+
                 {totalPortfolioValue > 0 ? (
                   <div className="h-[300px] w-full bg-white p-4 rounded-xl shadow-sm border border-indigo-50">
                     <ResponsiveContainer width="100%" height="100%">
@@ -377,7 +381,6 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {/* 💡 [모델 탭 통합] 검색 박스 및 모델 서브 탭 제어 처리 */}
           {['myassets', 'models'].includes(activeTab) && (
             <div className="relative bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
               {activeTab === 'models' ? (
@@ -517,7 +520,6 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {/* 💡 [모델 탭 통합] 공통 렌더러 함수로 3단 콤보 테이블 표출 */}
           {!['dividend', 'backtest', 'rebalance'].includes(activeTab) && (
             <>
               {isLoading ? (
