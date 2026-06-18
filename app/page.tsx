@@ -138,23 +138,44 @@ export default function Home() {
       <main className="max-w-7xl mx-auto">
         <StockTicker />
         <section className="bg-black text-white rounded-2xl p-6 shadow-lg mb-12">
-          {/* 💡 [요구사항] 한경 코리안마켓 아래에 Finviz Map 퀵링크 라인 배정 완료 */}
           <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-            <li className="flex gap-4 items-center border-b border-gray-900 pb-3"><span className="text-red-400 font-bold text-xs bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">Global</span><a href="https://www.hankyung.com/globalmarket/global-equity-market" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 글로벌마켓</a></li>
-            <li className="flex gap-4 items-center border-b border-gray-900 pb-3"><span className="text-blue-400 font-bold text-xs bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900 min-w-[56px] text-center">Korea</span><a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 코리안마켓</a></li>
-            <li className="flex gap-4 items-center border-b border-gray-900 pb-3"><span className="text-purple-400 font-bold text-xs bg-purple-950/50 px-2 py-0.5 rounded border border-purple-900 min-w-[56px] text-center">Analysis</span><a href="https://stockanalysis.com/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">StockAnalysis</a></li>
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+              <span className="text-red-400 font-bold text-xs bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">Global</span>
+              <a href="https://www.hankyung.com/globalmarket/global-equity-market" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 글로벌마켓</a>
+            </li>
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+              <span className="text-blue-400 font-bold text-xs bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900 min-w-[56px] text-center">Korea</span>
+              <a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 코리안마켓</a>
+            </li>
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+              <span className="text-purple-400 font-bold text-xs bg-purple-950/50 px-2 py-0.5 rounded border border-purple-900 min-w-[56px] text-center">StockA</span>
+              <a href="https://stockanalysis.com/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">StockAnalysis</a>
+            </li>
             
-            {/* 한경 코리안마켓 정하단 2층 자리 배치 */}
-            <li className="flex gap-4 items-center border-b border-gray-900 pb-3"><span className="text-teal-400 font-bold text-xs bg-teal-950/50 px-2 py-0.5 rounded border border-teal-900 min-w-[56px] text-center">S&P Map</span><a href="https://finviz.com/map.ashx" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Finviz 맵 (미국 전광판)</a></li>
+            {/* 💡 Finviz 색상을 핑크(pink)로 변경하여 구분감을 주었습니다! */}
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+              <span className="text-pink-400 font-bold text-xs bg-pink-950/50 px-2 py-0.5 rounded border border-pink-900 min-w-[56px] text-center">Finviz</span>
+              <a href="https://finviz.com/map.ashx" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Finviz Map</a>
+            </li>
             
-            <li className="flex gap-4 items-center border-b lg:border-b-0 border-gray-900 pb-3 lg:pb-0 pt-1"><span className="text-amber-400 font-bold text-xs bg-amber-950/50 px-2 py-0.5 rounded border border-amber-900 min-w-[56px] text-center">Cycle</span><a href="https://institutional.fidelity.com/app/item/RD_13569_40890.html" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">경기사이클</a></li>
-            <li className="flex gap-4 items-center pt-1"><span className="text-emerald-400 font-bold text-xs bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900 min-w-[56px] text-center">FED</span><a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">FED 점도표</a></li>
+            <li className="flex gap-4 items-center border-b lg:border-b-0 border-gray-900 pb-3 lg:pb-0 pt-1">
+              <span className="text-amber-400 font-bold text-xs bg-amber-950/50 px-2 py-0.5 rounded border border-amber-900 min-w-[56px] text-center">Cycle</span>
+              <a href="https://institutional.fidelity.com/app/item/RD_13569_40890.html" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">경기사이클</a>
+            </li>
+            <li className="flex gap-4 items-center pt-1">
+              <span className="text-emerald-400 font-bold text-xs bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900 min-w-[56px] text-center">FED</span>
+              <a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">FED 점도표</a>
+            </li>
           </ul>
         </section>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <NewsCard category="해외증시" /><NewsCard category="국제" /><NewsCard category="기업" />
-          <NewsCard category="부동산" /><NewsCard category="경제" /><NewsCard category="금융" />
+          <NewsCard category="해외증시" />
+          <NewsCard category="국제" />
+          <NewsCard category="기업" />
+          <NewsCard category="부동산" />
+          <NewsCard category="경제" />
+          <NewsCard category="금융" />
         </div>
       </main>
     </div>
