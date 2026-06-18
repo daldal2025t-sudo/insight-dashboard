@@ -69,6 +69,11 @@ function StockTicker() {
   const line1Stocks = liveData && liveData.length >= 6 ? liveData.slice(0, 6) : defaultStocks;
   const line2Macros = liveData && liveData.length >= 6 ? liveData.slice(6) : defaultMacros;
 
+  // 💡 [VIP 카드 추출 로직] 백엔드에서 S&P500, 다우, 나스닥만 쏙 뽑아옵니다!
+  const sp500 = line1Stocks.find(d => d.name === 'S&P 500') || defaultStocks[0];
+  const dow = line1Stocks.find(d => d.name === 'DOW JONES') || defaultStocks[0];
+  const nasdaq = line1Stocks.find(d => d.name === 'NASDAQ') || defaultStocks[0];
+
   const renderItem = (item, index) => (
     <div key={index} className="p-3 md:p-4 border-b md:border-b-0 md:border-r border-white flex flex-col justify-between bg-gray-100 hover:bg-gray-200 transition cursor-default">
       <span className="text-xs md:text-sm font-bold text-gray-800 mb-2 truncate">{item.name}</span>
@@ -77,8 +82,6 @@ function StockTicker() {
           {item.value}<span className="text-[10px] md:text-xs font-normal ml-0.5 text-gray-500">{item.suffix || ''}</span>
         </span>
         <div className="flex flex-col items-end gap-1 shrink-0">
-          
-          {/* 메인 선물 및 지수 등락률 표기부 */}
           <div className="flex items-center gap-0.5 md:gap-1 leading-none">
             {item.isUp === true && <svg className="w-3 h-3 md:w-4 md:h-4 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
             {item.isUp === false && <svg className="w-3 h-3 md:w-4 md:h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
@@ -86,8 +89,6 @@ function StockTicker() {
               {item.changeAmt && `${item.changeAmt} `}({item.change})
             </span>
           </div>
-
-          {/* 💡 현물 등락률 표기부 (듀얼 복구 완료!) */}
           {item.spotChange && (
             <div className="flex items-center gap-0.5 md:gap-1 leading-none mt-1">
               <span className="text-[9px] bg-gray-300 text-gray-600 px-1 rounded font-bold tracking-tighter">현</span>
@@ -98,7 +99,6 @@ function StockTicker() {
               </span>
             </div>
           )}
-
         </div>
       </div>
       <div className={`h-1 w-full mt-2 md:mt-3 ${item.isUp === true ? 'bg-pink-600' : item.isUp === false ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
@@ -106,20 +106,68 @@ function StockTicker() {
   );
 
   return (
-    <section className="mb-12 flex flex-col gap-4">
-      <div>
-        <div className="bg-gray-500 text-white px-4 py-2 flex justify-between items-center">
-          <h2 className="text-lg font-bold tracking-tight">글로벌 핵심 증시 (실시간)</h2>
-          <button onClick={fetchStocks} className="text-xs bg-gray-600 hover:bg-gray-700 px-3 py-1.5 rounded-md transition flex items-center gap-1">↻ 다시 로딩</button>
+    <section className="mb-12 flex flex-col gap-6">
+      
+      {/* 💡 [NEW] 미국 증시 3대장 VIP 카드 섹션 */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2 px-1">
+          {/* 깜빡이는 라이브(Live) 인디케이터 */}
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+          </span>
+          <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">미국 증시 <span className="text-sm font-bold text-gray-400 ml-1">Live</span></h2>
+          <div className="ml-auto">
+             <button onClick={fetchStocks} className="text-xs font-bold text-gray-500 bg-white border border-gray-200 hover:bg-gray-50 px-3 py-1.5 rounded-full transition shadow-sm flex items-center gap-1">↻ 새로고침</button>
+          </div>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-6">{line1Stocks.map((stock, index) => renderItem(stock, index))}</div>
-      </div>
-      <div>
-        <div className="bg-slate-700 text-white px-4 py-2 flex justify-between items-center">
-          <h2 className="text-lg font-bold tracking-tight">외환 및 주요 거시경제 지표 (실시간)</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[sp500, dow, nasdaq].map((idxData, idx) => (
+            <div key={idx} className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between transition hover:shadow-md">
+              <span className="text-sm font-extrabold text-gray-500 mb-2">{idxData.name}</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-3xl md:text-4xl font-black text-gray-900 tracking-tighter">
+                  {idxData.value === '-' ? (
+                    <span className="text-gray-300 text-2xl">로딩중...</span>
+                  ) : (
+                    idxData.value
+                  )}
+                </span>
+                
+                {/* 등락률 & 절대금액 표기 */}
+                {idxData.value !== '-' && (
+                  <div className={`flex items-center gap-1.5 font-bold text-sm md:text-base mt-1 ${idxData.isUp === true ? 'text-pink-600' : idxData.isUp === false ? 'text-blue-500' : 'text-gray-500'}`}>
+                    {idxData.isUp === true ? '▲' : idxData.isUp === false ? '▼' : ''}
+                    <span>{idxData.changeAmt}</span>
+                    <span>({idxData.change})</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6">{line2Macros.map((macro, index) => renderItem(macro, index))}</div>
       </div>
+
+      {/* 기존 글로벌 전광판 섹션 */}
+      <div className="mt-4">
+        <div className="bg-gray-500 text-white px-4 py-2 flex justify-between items-center rounded-t-xl">
+          <h2 className="text-sm md:text-base font-bold tracking-tight">글로벌 핵심 증시 (선물/현물 듀얼)</h2>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-6 border-x border-b border-gray-200 rounded-b-xl overflow-hidden">
+          {line1Stocks.map((stock, index) => renderItem(stock, index))}
+        </div>
+      </div>
+
+      <div>
+        <div className="bg-slate-700 text-white px-4 py-2 flex justify-between items-center rounded-t-xl">
+          <h2 className="text-sm md:text-base font-bold tracking-tight">외환 및 주요 거시경제 지표</h2>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 border-x border-b border-gray-200 rounded-b-xl overflow-hidden">
+          {line2Macros.map((macro, index) => renderItem(macro, index))}
+        </div>
+      </div>
+
     </section>
   );
 }
@@ -133,7 +181,7 @@ export default function Home() {
           <h1 className="text-2xl md:text-4xl font-extrabold text-gray-900 mt-1 mb-2">KIJAY Daily Insight</h1>
           <p className="text-gray-500 text-xs md:text-sm">실시간 경제 및 글로벌 자산 시장의 핵심 지표를 트래킹하는 금융 대시보드입니다.</p>
         </div>
-        <Link href="/archive" className="bg-black text-white px-4 py-2 md:px-5 md:py-2 rounded-full font-bold text-xs md:text-sm hover:bg-gray-800 transition shrink-0">포트폴리오</Link>
+        <Link href="/archive" className="bg-black text-white px-4 py-2 md:px-5 md:py-2 rounded-full font-bold text-xs md:text-sm hover:bg-gray-800 transition shadow-md shrink-0">포트폴리오 빌더 →</Link>
       </header>
       
       <main className="max-w-7xl mx-auto">
