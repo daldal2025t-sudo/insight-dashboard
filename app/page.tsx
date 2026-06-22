@@ -139,6 +139,7 @@ export default function Home() {
         <StockTicker />
         <section className="bg-black text-white rounded-2xl p-6 shadow-lg mb-12">
           <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+            {/* 1층 */}
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-red-400 font-bold text-xs bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">Global</span>
               <a href="https://www.hankyung.com/globalmarket/global-equity-market" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 글로벌마켓</a>
@@ -152,30 +153,37 @@ export default function Home() {
               <a href="https://stockanalysis.com/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">StockAnalysis</a>
             </li>
             
-            {/* 💡 Finviz 색상을 핑크(pink)로 변경하여 구분감을 주었습니다! */}
+            {/* 2층 */}
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-pink-400 font-bold text-xs bg-pink-950/50 px-2 py-0.5 rounded border border-pink-900 min-w-[56px] text-center">Finviz</span>
               <a href="https://finviz.com/map.ashx" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Finviz Map</a>
             </li>
-            
-            <li className="flex gap-4 items-center border-b lg:border-b-0 border-gray-900 pb-3 lg:pb-0 pt-1">
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+              <span className="text-orange-400 font-bold text-xs bg-orange-950/50 px-2 py-0.5 rounded border border-orange-900 min-w-[56px] text-center">Blog</span>
+              <a href="https://blog.naver.com/good-day-go" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Good Day Go 블로그</a>
+            </li>
+            <li className="flex gap-4 items-center border-b lg:border-b-0 border-gray-900 pb-3 lg:pb-0">
               <span className="text-amber-400 font-bold text-xs bg-amber-950/50 px-2 py-0.5 rounded border border-amber-900 min-w-[56px] text-center">Cycle</span>
               <a href="https://institutional.fidelity.com/app/item/RD_13569_40890.html" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">경기사이클</a>
             </li>
-            <li className="flex gap-4 items-center pt-1">
+
+            {/* 3층 */}
+            <li className="flex gap-4 items-center pt-2">
               <span className="text-emerald-400 font-bold text-xs bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900 min-w-[56px] text-center">FED</span>
               <a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">FED 점도표</a>
             </li>
           </ul>
         </section>
         
+        {/* 💡 [요구사항] 뉴스 카테고리를 명시해주신 순서대로 개편 완료! (해외증시 -> 경제 -> 금융 -> 기업 -> 부동산 -> 사회 -> 국제) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <NewsCard category="해외증시" />
-          <NewsCard category="국제" />
-          <NewsCard category="기업" />
-          <NewsCard category="부동산" />
           <NewsCard category="경제" />
           <NewsCard category="금융" />
+          <NewsCard category="기업" />
+          <NewsCard category="부동산" />
+          <NewsCard category="사회" />
+          <NewsCard category="국제" />
         </div>
       </main>
     </div>
