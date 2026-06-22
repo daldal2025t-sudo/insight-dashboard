@@ -139,7 +139,7 @@ export default function Home() {
         <StockTicker />
         <section className="bg-black text-white rounded-2xl p-6 shadow-lg mb-12">
           <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-            {/* 1층 */}
+            {/* 1층 (블로그 배지 명칭 및 위치 스왑 적용) */}
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-red-400 font-bold text-xs bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">Global</span>
               <a href="https://www.hankyung.com/globalmarket/global-equity-market" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 글로벌마켓</a>
@@ -149,18 +149,18 @@ export default function Home() {
               <a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 코리안마켓</a>
             </li>
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
-              <span className="text-purple-400 font-bold text-xs bg-purple-950/50 px-2 py-0.5 rounded border border-purple-900 min-w-[56px] text-center">StockA</span>
-              <a href="https://stockanalysis.com/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">StockAnalysis</a>
+              <span className="text-orange-400 font-bold text-xs bg-orange-950/50 px-2 py-0.5 rounded border border-orange-900 min-w-[56px] text-center">Blog</span>
+              <a href="https://blog.naver.com/good-day-go" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Good Day Go</a>
             </li>
             
-            {/* 2층 */}
+            {/* 2층 (StockAnalysis 위치 스왑 적용) */}
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-pink-400 font-bold text-xs bg-pink-950/50 px-2 py-0.5 rounded border border-pink-900 min-w-[56px] text-center">Finviz</span>
               <a href="https://finviz.com/map.ashx" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Finviz Map</a>
             </li>
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
-              <span className="text-orange-400 font-bold text-xs bg-orange-950/50 px-2 py-0.5 rounded border border-orange-900 min-w-[56px] text-center">Blog</span>
-              <a href="https://blog.naver.com/good-day-go" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Good Day Go 블로그</a>
+              <span className="text-purple-400 font-bold text-xs bg-purple-950/50 px-2 py-0.5 rounded border border-purple-900 min-w-[56px] text-center">StockA</span>
+              <a href="https://stockanalysis.com/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">StockAnalysis</a>
             </li>
             <li className="flex gap-4 items-center border-b lg:border-b-0 border-gray-900 pb-3 lg:pb-0">
               <span className="text-amber-400 font-bold text-xs bg-amber-950/50 px-2 py-0.5 rounded border border-amber-900 min-w-[56px] text-center">Cycle</span>
@@ -175,7 +175,6 @@ export default function Home() {
           </ul>
         </section>
         
-        {/* 💡 [요구사항] 뉴스 카테고리를 명시해주신 순서대로 개편 완료! (해외증시 -> 경제 -> 금융 -> 기업 -> 부동산 -> 사회 -> 국제) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <NewsCard category="해외증시" />
           <NewsCard category="경제" />
