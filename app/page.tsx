@@ -139,7 +139,7 @@ export default function Home() {
         <StockTicker />
         <section className="bg-black text-white rounded-2xl p-6 shadow-lg mb-12">
           <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-            {/* 1층 (블로그 배지 명칭 및 위치 스왑 적용) */}
+            {/* 1층 */}
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-red-400 font-bold text-xs bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">Global</span>
               <a href="https://www.hankyung.com/globalmarket/global-equity-market" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 글로벌마켓</a>
@@ -148,12 +148,15 @@ export default function Home() {
               <span className="text-blue-400 font-bold text-xs bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900 min-w-[56px] text-center">Korea</span>
               <a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 코리안마켓</a>
             </li>
-            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+            
+            {/* 💡 [주석 처리] 블로그 버튼 임시 비활성화 */}
+            {/* <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-orange-400 font-bold text-xs bg-orange-950/50 px-2 py-0.5 rounded border border-orange-900 min-w-[56px] text-center">Blog</span>
               <a href="https://blog.naver.com/good-day-go" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Good Day Go</a>
-            </li>
-            
-            {/* 2층 (StockAnalysis 위치 스왑 적용) */}
+            </li> 
+            */}
+
+            {/* 2층 (블로그 비활성화로 인해 자연스럽게 배열이 당겨집니다) */}
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-pink-400 font-bold text-xs bg-pink-950/50 px-2 py-0.5 rounded border border-pink-900 min-w-[56px] text-center">Finviz</span>
               <a href="https://finviz.com/map.ashx" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Finviz Map</a>
