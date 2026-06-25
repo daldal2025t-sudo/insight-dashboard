@@ -72,15 +72,22 @@ function StockTicker() {
   const renderItem = (item, index) => (
     <div key={index} className="p-3 md:p-4 border-b md:border-b-0 md:border-r border-white flex flex-col justify-between bg-gray-100 hover:bg-gray-200 transition cursor-default">
       <span className="text-xs md:text-sm font-bold text-gray-800 mb-2 truncate">{item.name}</span>
-      <div className="flex justify-between items-end gap-2">
-        <span className="text-sm md:text-lg font-extrabold tracking-tighter text-gray-900 leading-none truncate pr-1">
+      
+      {/* 💡 gap-2를 gap-1로 줄여서 좌우 여유 공간 확보 */}
+      <div className="flex justify-between items-end gap-1">
+        
+        {/* 💡 md:text-lg를 md:text-base로 낮춰서 글자 크기 최적화 및 우측 여백(pr-1) 제거 */}
+        <span className="text-sm md:text-base font-extrabold tracking-tighter text-gray-900 leading-none truncate">
           {item.value}<span className="text-[10px] md:text-xs font-normal ml-0.5 text-gray-500">{item.suffix || ''}</span>
         </span>
+        
         <div className="flex flex-col items-end gap-1 shrink-0">
           <div className="flex items-center gap-0.5 md:gap-1 leading-none">
-            {item.isUp === true && <svg className="w-3 h-3 md:w-4 md:h-4 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
-            {item.isUp === false && <svg className="w-3 h-3 md:w-4 md:h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
-            <span className={`text-[10px] md:text-sm font-semibold ${item.isUp === true ? 'text-pink-600' : item.isUp === false ? 'text-blue-500' : 'text-gray-500'}`}>
+            {item.isUp === true && <svg className="w-3 h-3 md:w-3.5 md:h-3.5 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
+            {item.isUp === false && <svg className="w-3 h-3 md:w-3.5 md:h-3.5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
+            
+            {/* 💡 변동폭 텍스트 크기도 md:text-sm에서 md:text-xs로 조정 */}
+            <span className={`text-[10px] md:text-xs font-semibold ${item.isUp === true ? 'text-pink-600' : item.isUp === false ? 'text-blue-500' : 'text-gray-500'}`}>
               {item.changeAmt && `${item.changeAmt} `}({item.change})
             </span>
           </div>
@@ -89,7 +96,7 @@ function StockTicker() {
               <span className="text-[9px] bg-gray-300 text-gray-600 px-1 rounded font-bold tracking-tighter">현</span>
               {item.isSpotUp === true && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
               {item.isSpotUp === false && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
-              <span className={`text-[10px] md:text-xs font-semibold ${item.isSpotUp === true ? 'text-pink-600' : item.isSpotUp === false ? 'text-blue-500' : 'text-gray-500'}`}>
+              <span className={`text-[10px] md:text-[11px] font-semibold ${item.isSpotUp === true ? 'text-pink-600' : item.isSpotUp === false ? 'text-blue-500' : 'text-gray-500'}`}>
                 {item.spotChange}
               </span>
             </div>
@@ -160,7 +167,7 @@ export default function Home() {
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               {/* 🔥 여기서 뱃지 텍스트를 Index로 변경했습니다! */}
               <span className="text-pink-400 font-bold text-xs bg-pink-950/50 px-2 py-0.5 rounded border border-pink-900 min-w-[56px] text-center">Index</span>
-              <a href="https://www.indexergo.com/index?group=usa" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Indexergo Map</a>
+              <a href="https://www.indexergo.com/index?group=usa" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Indexergo</a>
             </li>
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-purple-400 font-bold text-xs bg-purple-950/50 px-2 py-0.5 rounded border border-purple-900 min-w-[56px] text-center">StockA</span>
