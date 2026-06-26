@@ -9,6 +9,7 @@ export default function ArchivePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [cyclePhase, setCyclePhase] = useState('mid'); 
   const [editModelTarget, setEditModelTarget] = useState('aggressive');
+  const [budget, setBudget] = useState('');
 
   // 💡 [체크리스트 상태 관리] 카테고리(stockType)를 없애고 9개 문항으로 대폭 확장!
   const [checks, setChecks] = useState({ q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false, q8: false, q9: false });
@@ -246,64 +247,127 @@ export default function ArchivePage() {
     </div>
   );
 
-  const renderTable = (items, tabKeyForEdit, titleStr) => {
+  const renderTable = (items, tabKeyForEdit, titleStr) => { 
     const isChecker = tabKeyForEdit === 'checker';
+
     return (
-      <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 mt-6 first:mt-0">
-        {titleStr && <h3 className="font-extrabold text-gray-900 text-sm md:text-base border-b border-gray-50 pb-3 mb-3">{titleStr}</h3>}
-        <div className="grid grid-cols-12 text-[10px] md:text-xs font-bold text-gray-400 border-b border-gray-100 pb-3 mb-3 px-2">
-          <span className="col-span-5">ETF 종목정보</span>
-          <span className="col-span-3 text-center">{isChecker ? '보유개수' : '목표비중 / 순서'}</span>
-          <span className="col-span-4 text-right">{isChecker ? '실시간 평가액 / 비중' : '현재가 / 등락률'}</span>
+      <div className="mb-8">
+        {titleStr && <h2 className="text-xl font-bold mb-4">{titleStr}</h2>}
+
+        {/* 🔥 투자 금액 입력 칸 (포트폴리오 빌더 탭일 때만 렌더링) */}
+        {!isChecker && (
+          <div className="mb-4 bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col md:flex-row md:items-center gap-3 shadow-sm">
+            <label className="text-sm font-bold text-blue-900 whitespace-nowrap">
+              💰 총 투자 금액 (원)
+            </label>
+            <div className="relative w-full max-w-sm">
+              <input
+                type="number"
+                min="0"
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                placeholder="예: 10000000 (1천만 원)"
+                className="w-full border border-blue-200 rounded-lg py-2 px-3 pr-8 text-right font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+              <span className="absolute right-3 top-2.5 text-gray-500 font-bold text-sm">원</span>
+            </div>
+            {budget && (
+              <span className="text-xs text-blue-600 font-semibold">
+                * 입력하신 금액에 맞춰 비중별 매수 수량이 자동 계산됩니다.
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* 테이블 헤더 */}
+        <div className="grid grid-cols-3 md:grid-cols-4 gap-2 bg-gray-800 text-white p-3 rounded-t-lg text-xs md:text-sm font-bold text-center items-center">
+          <div className="col-span-1 text-left pl-2">ETF 종목정보</div>
+          <div>{isChecker ? '보유개수' : '목표비중 / 순서'} [cite: 171]</div>
+          <div>{isChecker ? '실시간 평가액 / 비중' : '현재가 / 등락률'} [cite: 171]</div>
+          {/* 모델 포트폴리오용 추가 헤더 */}
+          {!isChecker && <div className="hidden md:block text-amber-300">매수 목표 수량</div>}
         </div>
-        <div className="flex flex-col gap-2">
+
+        {/* 테이블 리스트 렌더링 */}
+        <div className="border-x border-b border-gray-200 rounded-b-lg divide-y divide-gray-100 bg-white">
           {items.length === 0 ? (
-            <div className="text-center py-10 text-gray-400 font-bold text-sm">
-              종목이 없습니다. <br/><span className="text-xs font-medium text-gray-400 mt-2 block">위의 검색창에서 ETF를 추가해 보세요!</span>
+            <div className="p-8 text-center text-gray-400 font-bold text-sm">
+              종목이 없습니다. 위의 검색창에서 ETF를 추가해 보세요! [cite: 171]
             </div>
-          ) : items.map((etf, index) => (
-            <div key={index} className="grid grid-cols-12 items-center px-2 py-2.5 border-b border-gray-50 last:border-0 gap-2">
-              <div className="col-span-5 min-w-0 flex items-center gap-1.5 h-full">
-                {!isChecker && (
-                  <button onClick={() => handleRemoveStockFromTab(tabKeyForEdit, etf.code)} className="text-gray-300 hover:text-red-500 text-xs font-bold transition shrink-0 p-1">✕</button>
-                )}
-                <div className="flex flex-col justify-center min-w-0 gap-0.5">
-                  <p className="font-bold text-gray-900 text-[11px] md:text-sm leading-tight break-keep">{etf.name}</p>
-                  <p className="text-[9px] md:text-[11px] text-gray-400 font-medium leading-none">ETF {etf.code}</p>
-                </div>
-              </div>
-              <div className="col-span-3 flex justify-center items-center h-full">
-                {isChecker ? (
-                  <input type="number" min="0" placeholder="0" value={etf.qty === 0 ? '' : etf.qty} onChange={(e) => handleQtyChange(etf.code, e.target.value)} className="w-full max-w-[70px] md:max-w-[100px] text-center border border-gray-300 rounded-lg p-1 text-sm font-bold bg-gray-50 focus:bg-white focus:ring-2 focus:ring-black outline-none transition" />
-                ) : (
-                  <div className="flex items-center gap-1">
-                    <div className="flex flex-col text-[10px] text-gray-400 font-bold shrink-0">
-                      <button onClick={() => handleMoveOrder(tabKeyForEdit, index, 'up')} disabled={index === 0} className="hover:text-black disabled:opacity-20 leading-none py-0.5">▲</button>
-                      <button onClick={() => handleMoveOrder(tabKeyForEdit, index, 'down')} disabled={index === items.length - 1} className="hover:text-black disabled:opacity-20 leading-none py-0.5">▼</button>
+          ) : (
+            items.map((etf, index) => {
+              // 🔥 매수 수량 계산 로직
+              const rawPrice = getRawPrice(etf.value); // 현재가 숫자만 추출 [cite: 140]
+              const targetWeightValue = parseFloat(String(etf.targetWeight).replace('%', '')) || 0;
+              const allocatedAmount = budget ? (Number(budget) * targetWeightValue) / 100 : 0;
+              // 내림 처리(Math.floor)로 보수적인 매수 수량 산정
+              const sharesToBuy = rawPrice > 0 ? Math.floor(allocatedAmount / rawPrice) : 0; 
+
+              return (
+                <div key={etf.code} className="grid grid-cols-3 md:grid-cols-4 gap-2 p-3 items-center text-center text-sm hover:bg-gray-50 transition">
+                  {/* 1열: 종목 이름 및 삭제 버튼 */}
+                  <div className="col-span-1 flex items-center gap-2 text-left pl-1">
+                    {!isChecker && (
+                      <button onClick={() => handleRemoveStockFromTab(tabKeyForEdit, etf.code)} className="text-gray-300 hover:text-red-500 text-xs font-bold transition shrink-0 p-1">✕</button> [cite: 171]
+                    )}
+                    <div>
+                      <div className="font-bold text-gray-900 leading-tight">{etf.name}</div>
+                      <div className="text-[10px] text-gray-400">ETF {etf.code}</div> [cite: 171]
                     </div>
-                    <input type="text" value={etf.targetWeight || '0%'} onChange={(e) => handleWeightChange(tabKeyForEdit, etf.code, e.target.value)} className="w-10 md:w-11 border border-gray-200 rounded text-center text-[10px] md:text-[11px] font-bold bg-slate-50 text-blue-600 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none py-0 m-0 leading-none h-5" />
                   </div>
-                )}
-              </div>
-              <div className="col-span-4 flex flex-col items-end justify-center h-full gap-0.5">
-                {isChecker ? (
-                  <>
-                    <span className="text-xs md:text-sm font-extrabold text-gray-900 tracking-tight leading-none text-right break-all">{etf.evalValue.toLocaleString('ko-KR')}<span className="text-[9px] md:text-[10px] font-normal text-gray-400 ml-0.5">원</span></span>
-                    <div className="flex items-center"><span className="text-[10px] font-black text-blue-600 bg-blue-50 px-1.5 py-[1px] rounded tracking-tighter leading-none">{etf.realWeight.toFixed(1)}%</span></div>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-xs md:text-sm font-extrabold text-gray-900 tracking-tight leading-none text-right">{etf.value}<span className="text-[9px] md:text-[10px] font-normal text-gray-400 ml-0.5">원</span></span>
-                    <div className="flex items-center gap-0.5 text-[9px] md:text-xs font-bold leading-none mt-0.5">
-                      {etf.isUp === true && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
-                      {etf.isUp === false && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
-                      <span className={etf.isUp === true ? 'text-pink-600' : etf.isUp === false ? 'text-blue-500' : 'text-gray-500'}>{etf.changeAmt}원 ({etf.change})</span>
+
+                  {/* 2열: 비중/순서 조절 또는 보유개수 입력 */}
+                  <div className="flex justify-center items-center gap-1">
+                    {isChecker ? (
+                      <input type="number" min="0" placeholder="0" value={etf.qty === 0 ? '' : etf.qty} onChange={(e) => handleQtyChange(etf.code, e.target.value)} className="w-full max-w-[70px] text-center border border-gray-300 rounded-lg p-1 text-sm font-bold bg-gray-50 focus:bg-white focus:ring-2 focus:ring-black outline-none transition" /> [cite: 171]
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <div className="flex flex-col">
+                          <button onClick={() => handleMoveOrder(tabKeyForEdit, index, 'up')} disabled={index === 0} className="hover:text-black disabled:opacity-20 leading-none py-0.5 text-[10px]">▲</button> [cite: 172]
+                          <button onClick={() => handleMoveOrder(tabKeyForEdit, index, 'down')} disabled={index === items.length - 1} className="hover:text-black disabled:opacity-20 leading-none py-0.5 text-[10px]">▼</button> [cite: 172]
+                        </div>
+                        <input type="text" value={etf.targetWeight || [cite_start]'0%'} onChange={(e) => handleWeightChange(tabKeyForEdit, etf.code, e.target.value)} className="w-12 border border-gray-200 rounded text-center text-xs font-bold bg-slate-50 text-blue-600 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none py-1 m-0" /> [cite: 173]
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3열: 평가액/현재가 */}
+                  <div className="flex flex-col items-center justify-center leading-tight">
+                    {isChecker ? (
+                      <>
+                        <span className="font-bold text-gray-800">{etf.evalValue.toLocaleString('ko-KR')}원</span> [cite: 174]
+                        <span className="text-[10px] text-gray-500">{etf.realWeight.toFixed(1)}%</span> [cite: 174]
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-bold text-gray-900">{etf.value}원</span> [cite: 174]
+                        <div className="flex items-center gap-0.5 mt-0.5">
+                          {etf.isUp === true && <svg className="w-2.5 h-2.5 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>} [cite: 174]
+                          {etf.isUp === false && <svg className="w-2.5 h-2.5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>} [cite: 175]
+                          <span className={`text-[10px] font-bold ${etf.isUp === true ? 'text-pink-600' : etf.isUp === false ? [cite_start]'text-blue-500' : 'text-gray-500'}`}>{etf.changeAmt}원 ({etf.change})</span> [cite: 175, 176]
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* 4열 (새로 추가됨): 매수 목표 수량 및 금액 */}
+                  {!isChecker && (
+                    <div className="col-span-3 md:col-span-1 flex flex-row md:flex-col justify-center items-center gap-2 md:gap-0 mt-2 md:mt-0 pt-2 md:pt-0 border-t border-gray-100 md:border-0">
+                      <span className="md:hidden text-xs font-bold text-gray-500">매수 목표: </span>
+                      {budget ? (
+                        <>
+                          <span className="font-extrabold text-amber-600 text-base">{sharesToBuy.toLocaleString('ko-KR')} 주</span>
+                          <span className="text-[10px] text-gray-400">({Math.floor(allocatedAmount).toLocaleString('ko-KR')}원 배정)</span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-300">-</span>
+                      )}
                     </div>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     );
