@@ -10,17 +10,17 @@ export default function ArchivePage() {
   const [cyclePhase, setCyclePhase] = useState('mid'); 
   const [editModelTarget, setEditModelTarget] = useState('aggressive');
 
-  // 🔥 [새로 추가된 상태] 총 투자 금액 입력값
   const [budget, setBudget] = useState('');
 
-  // 💡 [체크리스트 상태 관리] 카테고리(stockType)를 없애고 9개 문항으로 대폭 확장!
   const [checks, setChecks] = useState({ q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false, q8: false, q9: false });
 
+  // 🔥 [수정] tabLists 초기 상태에 leverage(레버리지) 포트폴리오 추가
   const [tabLists, setTabLists] = useState({
     myassets: [],
     aggressive: [{ code: '449190', weight: '65%' }, { code: '0046Y0', weight: '25%' }, { code: '280930', weight: '10%' }],
     neutral: [{ code: '449180', weight: '30%' }, { code: '0046Y0', weight: '20%' }, { code: '488500', weight: '10%' }, { code: '309230', weight: '10%' }, { code: '280930', weight: '10%' }],
-    stable: [{ code: '449180', weight: '30%' }, { code: '488500', weight: '10%' }, { code: '452360', weight: '20%' }, { code: '429000', weight: '10%' }]
+    stable: [{ code: '449180', weight: '30%' }, { code: '488500', weight: '10%' }, { code: '452360', weight: '20%' }, { code: '429000', weight: '10%' }],
+    leverage: [{ code: 'TQQQ', weight: '50%' }, { code: 'SOXL', weight: '50%' }]
   });
 
   const [quantities, setQuantities] = useState({});
@@ -29,7 +29,16 @@ export default function ArchivePage() {
 
   useEffect(() => {
     const savedTabLists = localStorage.getItem('kijay_tab_configurations');
-    if (savedTabLists) { try { setTabLists(JSON.parse(savedTabLists)); } catch (e) {} }
+    if (savedTabLists) { 
+      try { 
+        const parsedLists = JSON.parse(savedTabLists);
+        // 🔥 기존 사용자 브라우저 캐시에 leverage 데이터가 없을 경우 기본값 주입 방어 로직
+        if (!parsedLists.leverage) {
+          parsedLists.leverage = [{ code: 'TQQQ', weight: '50%' }, { code: 'SOXL', weight: '50%' }];
+        }
+        setTabLists(parsedLists); 
+      } catch (e) {} 
+    }
     const savedQuantities = localStorage.getItem('kijay_etf_counts_v2');
     if (savedQuantities) { try { setQuantities(JSON.parse(savedQuantities)); } catch (e) {} }
 
@@ -56,10 +65,10 @@ export default function ArchivePage() {
   const handleAddStockToTab = (code) => {
     if (['checker', 'rebalance', 'dividend', 'backtest', 'checklist'].includes(activeTab)) return;
     const targetTab = activeTab === 'models' ? editModelTarget : activeTab;
-    const isExist = tabLists[targetTab].some(item => item.code === code);
+    const isExist = tabLists[targetTab]?.some(item => item.code === code);
     if (isExist) return;
 
-    const updatedTabList = [...tabLists[targetTab], { code, weight: '0%' }];
+    const updatedTabList = [...(tabLists[targetTab] || []), { code, weight: '0%' }];
     const nextState = { ...tabLists, [targetTab]: updatedTabList };
     setTabLists(nextState);
     localStorage.setItem('kijay_tab_configurations', JSON.stringify(nextState));
@@ -102,12 +111,14 @@ export default function ArchivePage() {
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.code.includes(searchQuery)
   );
 
+  // 🔥 [수정] checker 탭에서 레버리지 종목들도 함께 스캔하도록 추가
   const activeCheckerCodes = Array.from(new Set([
     ...tabLists.myassets.map(i => i.code), ...tabLists.aggressive.map(i => i.code),
-    ...tabLists.neutral.map(i => i.code), ...tabLists.stable.map(i => i.code)
+    ...tabLists.neutral.map(i => i.code), ...tabLists.stable.map(i => i.code),
+    ...(tabLists.leverage || []).map(i => i.code)
   ]));
 
-  const getRawPrice = (valStr) => parseFloat(valStr.replace(/[^0-9.-]/g, '')) || 0;
+  const getRawPrice = (valStr) => parseFloat(String(valStr).replace(/[^0-9.-]/g, '')) || 0;
 
   let totalPortfolioValue = 0;
   let totalAnnualDividend = 0; 
@@ -118,7 +129,7 @@ export default function ArchivePage() {
   const isCalculationRequired = ['checker', 'rebalance', 'dividend', 'backtest'].includes(activeTab);
 
   const getMappedItems = (tabKey) => {
-    return tabLists[tabKey].map(config => {
+    return (tabLists[tabKey] || []).map(config => {
       const foundData = masterPool.find(p => p.code === config.code);
       return {
         code: config.code, targetWeight: config.weight,
@@ -249,10 +260,10 @@ export default function ArchivePage() {
     </div>
   );
 
-  // 🔥 매수 수량 기능이 추가된 새로운 렌더 테이블 로직
   const renderTable = (items, tabKeyForEdit, titleStr) => {
     const isChecker = tabKeyForEdit === 'checker';
-    const isModel = ['aggressive', 'neutral', 'stable'].includes(tabKeyForEdit);
+    // 🔥 [수정] 모델 포트폴리오 여부 체크에 leverage 추가
+    const isModel = ['aggressive', 'neutral', 'stable', 'leverage'].includes(tabKeyForEdit);
 
     return (
       <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 mt-6 first:mt-0">
@@ -271,7 +282,6 @@ export default function ArchivePage() {
               종목이 없습니다. <br/><span className="text-xs font-medium text-gray-400 mt-2 block">위의 검색창에서 ETF를 추가해 보세요!</span>
             </div>
           ) : items.map((etf, index) => {
-            // 🔥 매수 수량 계산 로직
             const rawPrice = getRawPrice(etf.value);
             const targetWeightValue = parseFloat(String(etf.targetWeight).replace('%', '')) || 0;
             const allocatedAmount = budget ? (Number(budget) * targetWeightValue) / 100 : 0;
@@ -322,7 +332,6 @@ export default function ArchivePage() {
                     )}
                   </div>
                   
-                  {/* 🔥 모델 포트폴리오 매수 수량 출력 영역 */}
                   {isModel && (
                     <div className="flex flex-col items-end justify-center gap-0.5 border-l border-gray-100 pl-2 shrink-0 w-[50px] md:w-[80px]">
                       {budget ? (
@@ -479,6 +488,8 @@ export default function ArchivePage() {
                     <button onClick={() => setEditModelTarget('aggressive')} className={`px-2 py-1 text-[10px] font-bold rounded ${editModelTarget==='aggressive'?'bg-white text-red-600 shadow-sm':'text-gray-500'}`}>공격형</button>
                     <button onClick={() => setEditModelTarget('neutral')} className={`px-2 py-1 text-[10px] font-bold rounded ${editModelTarget==='neutral'?'bg-white text-blue-600 shadow-sm':'text-gray-500'}`}>중립형</button>
                     <button onClick={() => setEditModelTarget('stable')} className={`px-2 py-1 text-[10px] font-bold rounded ${editModelTarget==='stable'?'bg-white text-emerald-600 shadow-sm':'text-gray-500'}`}>안정형</button>
+                    {/* 🔥 [수정] 레버리지 포션 편집 탭 버튼 추가 */}
+                    <button onClick={() => setEditModelTarget('leverage')} className={`px-2 py-1 text-[10px] font-bold rounded ${editModelTarget==='leverage'?'bg-white text-purple-600 shadow-sm':'text-gray-500'}`}>레버리지</button>
                   </div>
                 </div>
               ) : (
@@ -619,7 +630,6 @@ export default function ArchivePage() {
                   {activeTab === 'checker' && renderTable(finalMappedItems, 'checker')}
                   {activeTab === 'models' && (
                     <div className="flex flex-col gap-8">
-                      {/* 🔥 추가된 투자 금액 입력 UI (모델 탭 최상단에만 표시) */}
                       <div className="bg-blue-50 p-4 md:p-5 rounded-2xl border border-blue-100 flex flex-col md:flex-row md:items-center gap-4 shadow-sm">
                         <label className="text-sm md:text-base font-extrabold text-blue-900 whitespace-nowrap">
                           💰 총 투자 금액 (원)
@@ -636,13 +646,16 @@ export default function ArchivePage() {
                           <span className="absolute right-4 top-2 text-gray-500 font-bold text-sm">원</span>
                         </div>
                         <span className="text-xs font-semibold text-blue-600/80 break-keep">
-                          * 입력하신 금액에 맞춰 각 포트폴리오(공격/중립/안정형)의<br className="hidden md:block" />목표 비중에 따른 매수 수량이 자동 계산됩니다.
+                          * 입력하신 금액에 맞춰 각 포트폴리오의<br className="hidden md:block" />목표 비중에 따른 매수 수량이 자동 계산됩니다.
                         </span>
                       </div>
 
                       {renderTable(getMappedItems('aggressive'), 'aggressive', '🔥 공격형 포션')}
                       {renderTable(getMappedItems('neutral'), 'neutral', '⚖️ 중립형 포션')}
                       {renderTable(getMappedItems('stable'), 'stable', '🛡️ 안정형 포션')}
+                      
+                      {/* 🔥 [추가됨] 레버리지 포션 테이블 렌더링 */}
+                      {renderTable(getMappedItems('leverage'), 'leverage', '🚀 레버리지 포션')}
                     </div>
                   )}
                 </>
