@@ -11,10 +11,12 @@ export default function ArchivePage() {
   const [editModelTarget, setEditModelTarget] = useState('aggressive');
 
   const [budget, setBudget] = useState('');
+  
+  // 🔥 [수정됨] 자동 연동을 위해 초기값은 1400으로 두되, useEffect에서 실시간 환율을 덮어씌웁니다.
+  const [exchangeRate, setExchangeRate] = useState(1400);
 
   const [checks, setChecks] = useState({ q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false, q8: false, q9: false });
 
-  // 🔥 [수정] tabLists 초기 상태에 leverage(레버리지) 포트폴리오 추가
   const [tabLists, setTabLists] = useState({
     myassets: [],
     aggressive: [{ code: '449190', weight: '65%' }, { code: '0046Y0', weight: '25%' }, { code: '280930', weight: '10%' }],
@@ -28,11 +30,11 @@ export default function ArchivePage() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
+    // 1. 로컬 스토리지 데이터 로드
     const savedTabLists = localStorage.getItem('kijay_tab_configurations');
     if (savedTabLists) { 
       try { 
         const parsedLists = JSON.parse(savedTabLists);
-        // 🔥 기존 사용자 브라우저 캐시에 leverage 데이터가 없을 경우 기본값 주입 방어 로직
         if (!parsedLists.leverage) {
           parsedLists.leverage = [{ code: 'TQQQ', weight: '50%' }, { code: 'SOXL', weight: '50%' }];
         }
@@ -42,10 +44,28 @@ export default function ArchivePage() {
     const savedQuantities = localStorage.getItem('kijay_etf_counts_v2');
     if (savedQuantities) { try { setQuantities(JSON.parse(savedQuantities)); } catch (e) {} }
 
+    // 2. ETF 마스터 풀 데이터 로드
     fetch('/api/etfs')
       .then(res => res.json())
       .then(data => { if (!data.error) setMasterPool(data.pool || []); setIsLoading(false); })
       .catch(err => console.error(err));
+
+    // 🔥 3. [신규 추가] 메인 대시보드 API(/api/stocks)를 호출하여 실시간 원/달러 환율 긁어오기
+    fetch('/api/stocks')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          // 이름에 '환율'이 포함되거나 코드가 'KRW=X'인 항목 찾기
+          const krwItem = data.find(item => (item.name && item.name.includes('환율')) || item.code === 'KRW=X');
+          if (krwItem && krwItem.value) {
+            const parsedRate = parseFloat(String(krwItem.value).replace(/,/g, ''));
+            if (!isNaN(parsedRate)) {
+              setExchangeRate(parsedRate);
+            }
+          }
+        }
+      })
+      .catch(err => console.error('환율 연동 실패:', err));
   }, []);
 
   const handleWeightChange = (tab, code, textValue) => {
@@ -111,7 +131,6 @@ export default function ArchivePage() {
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.code.includes(searchQuery)
   );
 
-  // 🔥 [수정] checker 탭에서 레버리지 종목들도 함께 스캔하도록 추가
   const activeCheckerCodes = Array.from(new Set([
     ...tabLists.myassets.map(i => i.code), ...tabLists.aggressive.map(i => i.code),
     ...tabLists.neutral.map(i => i.code), ...tabLists.stable.map(i => i.code),
@@ -131,12 +150,14 @@ export default function ArchivePage() {
   const getMappedItems = (tabKey) => {
     return (tabLists[tabKey] || []).map(config => {
       const foundData = masterPool.find(p => p.code === config.code);
+      const isUS = foundData ? !foundData.symbol.endsWith('.KS') : false;
       return {
         code: config.code, targetWeight: config.weight,
         name: foundData ? foundData.name : '동기화 중',
         value: foundData ? foundData.value : '-', change: foundData ? foundData.change : '0.00%', 
         changeAmt: foundData ? foundData.changeAmt : '0', isUp: foundData ? foundData.isUp : null,
-        qty: quantities[config.code] || 0
+        qty: quantities[config.code] || 0,
+        isUS
       };
     });
   };
@@ -147,7 +168,10 @@ export default function ArchivePage() {
     const foundData = masterPool.find(p => p.code === config.code);
     const qty = quantities[config.code] || 0;
     const price = foundData ? getRawPrice(foundData.value) : 0;
-    const evalValue = price * qty;
+    const isUS = foundData ? !foundData.symbol.endsWith('.KS') : false;
+    
+    // 🔥 평가액 계산 시 미국 주식이면 실시간 연동된 환율을 곱해 원화로 통일
+    const evalValue = isUS ? price * qty * exchangeRate : price * qty;
 
     if (isCalculationRequired) {
       totalPortfolioValue += evalValue;
@@ -164,7 +188,8 @@ export default function ArchivePage() {
       name: foundData ? foundData.name : '동기화 중',
       value: foundData ? foundData.value : '-', change: foundData ? foundData.change : '0.00%', 
       changeAmt: foundData ? foundData.changeAmt : '0', isUp: foundData ? foundData.isUp : null,
-      qty, evalValue, xray: foundData ? foundData.xray : null
+      qty, evalValue, xray: foundData ? foundData.xray : null,
+      isUS
     };
   });
 
@@ -262,7 +287,6 @@ export default function ArchivePage() {
 
   const renderTable = (items, tabKeyForEdit, titleStr) => {
     const isChecker = tabKeyForEdit === 'checker';
-    // 🔥 [수정] 모델 포트폴리오 여부 체크에 leverage 추가
     const isModel = ['aggressive', 'neutral', 'stable', 'leverage'].includes(tabKeyForEdit);
 
     return (
@@ -285,7 +309,10 @@ export default function ArchivePage() {
             const rawPrice = getRawPrice(etf.value);
             const targetWeightValue = parseFloat(String(etf.targetWeight).replace('%', '')) || 0;
             const allocatedAmount = budget ? (Number(budget) * targetWeightValue) / 100 : 0;
-            const sharesToBuy = rawPrice > 0 ? Math.floor(allocatedAmount / rawPrice) : 0;
+            
+            // 매수 수량 계산 시 미국 주식은 달러가 기준이므로, 연동된 환율 적용
+            const priceInKRW = etf.isUS ? rawPrice * exchangeRate : rawPrice;
+            const sharesToBuy = priceInKRW > 0 ? Math.floor(allocatedAmount / priceInKRW) : 0;
 
             return (
               <div key={index} className="grid grid-cols-12 items-center px-2 py-2.5 border-b border-gray-50 last:border-0 gap-2">
@@ -317,16 +344,22 @@ export default function ArchivePage() {
                   <div className="flex flex-col items-end justify-center gap-0.5 flex-1">
                     {isChecker ? (
                       <>
-                        <span className="text-xs md:text-sm font-extrabold text-gray-900 tracking-tight leading-none text-right break-all">{etf.evalValue.toLocaleString('ko-KR')}<span className="text-[9px] md:text-[10px] font-normal text-gray-400 ml-0.5">원</span></span>
+                        <span className="text-xs md:text-sm font-extrabold text-gray-900 tracking-tight leading-none text-right break-all">
+                          {etf.evalValue.toLocaleString('ko-KR')}<span className="text-[9px] md:text-[10px] font-normal text-gray-400 ml-0.5">원</span>
+                        </span>
                         <div className="flex items-center"><span className="text-[10px] font-black text-blue-600 bg-blue-50 px-1.5 py-[1px] rounded tracking-tighter leading-none">{etf.realWeight.toFixed(1)}%</span></div>
                       </>
                     ) : (
                       <>
-                        <span className="text-xs md:text-sm font-extrabold text-gray-900 tracking-tight leading-none text-right">{etf.value}<span className="text-[9px] md:text-[10px] font-normal text-gray-400 ml-0.5">원</span></span>
+                        <span className="text-xs md:text-sm font-extrabold text-gray-900 tracking-tight leading-none text-right">
+                          {etf.isUS ? '$' : ''}{etf.value}<span className="text-[9px] md:text-[10px] font-normal text-gray-400 ml-0.5">{etf.isUS ? '' : '원'}</span>
+                        </span>
                         <div className="flex items-center gap-0.5 text-[9px] md:text-xs font-bold leading-none mt-0.5">
                           {etf.isUp === true && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
                           {etf.isUp === false && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
-                          <span className={etf.isUp === true ? 'text-pink-600' : etf.isUp === false ? 'text-blue-500' : 'text-gray-500'}>{etf.changeAmt}원 ({etf.change})</span>
+                          <span className={etf.isUp === true ? 'text-pink-600' : etf.isUp === false ? 'text-blue-500' : 'text-gray-500'}>
+                            {etf.isUS ? '$' : ''}{etf.changeAmt}{etf.isUS ? '' : '원'} ({etf.change})
+                          </span>
                         </div>
                       </>
                     )}
@@ -396,7 +429,7 @@ export default function ArchivePage() {
               </div>
 
               <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
-                {checklistData.map((item, index) => (
+                {checklistData.map((item) => (
                   <label key={item.id} className={`flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl border cursor-pointer transition ${checks[item.id] ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-transparent hover:bg-gray-100'}`}>
                     <input type="checkbox" checked={checks[item.id]} onChange={(e) => setChecks({...checks, [item.id]: e.target.checked})} className="mt-1 w-5 h-5 accent-indigo-600 shrink-0 cursor-pointer" />
                     <div className="flex flex-col">
@@ -430,9 +463,20 @@ export default function ArchivePage() {
           )}
 
           {isCalculationRequired && (
-            <div className="bg-black text-white p-6 rounded-2xl shadow-md flex justify-between items-center">
-              <div><p className="text-gray-400 text-xs font-bold tracking-wider">TOTAL PORTFOLIO ASSETS</p><p className="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">{totalPortfolioValue.toLocaleString('ko-KR')}<span className="text-sm font-normal text-gray-400 ml-1">원</span></p></div>
-              <span className="bg-white/10 border border-white/20 px-3 py-1 rounded-full font-bold text-xs text-gray-300 shrink-0">실시간 연동</span>
+            <div className="bg-black text-white p-6 rounded-2xl shadow-md flex justify-between items-center mb-6">
+              <div>
+                <p className="text-gray-400 text-xs font-bold tracking-wider">TOTAL PORTFOLIO ASSETS</p>
+                <p className="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">{totalPortfolioValue.toLocaleString('ko-KR')}<span className="text-sm font-normal text-gray-400 ml-1">원</span></p>
+              </div>
+              <div className="flex flex-col items-end gap-3">
+                <span className="bg-white/10 border border-white/20 px-3 py-1 rounded-full font-bold text-xs text-gray-300 shrink-0">실시간 연동</span>
+                {/* 🔥 [신규 추가] 보유 비중 탭 실시간 환율 뷰어 */}
+                <div className="flex items-center gap-2 bg-gray-800 px-2 py-1.5 rounded-lg border border-gray-700">
+                   <label className="text-[10px] font-bold text-gray-400">🇺🇸 실시간 환율</label>
+                   <span className="text-xs font-bold text-gray-200">{exchangeRate.toLocaleString('ko-KR', {maximumFractionDigits: 2})}</span>
+                   <span className="text-[10px] text-gray-500">원</span>
+                </div>
+              </div>
             </div>
           )}
 
@@ -488,17 +532,16 @@ export default function ArchivePage() {
                     <button onClick={() => setEditModelTarget('aggressive')} className={`px-2 py-1 text-[10px] font-bold rounded ${editModelTarget==='aggressive'?'bg-white text-red-600 shadow-sm':'text-gray-500'}`}>공격형</button>
                     <button onClick={() => setEditModelTarget('neutral')} className={`px-2 py-1 text-[10px] font-bold rounded ${editModelTarget==='neutral'?'bg-white text-blue-600 shadow-sm':'text-gray-500'}`}>중립형</button>
                     <button onClick={() => setEditModelTarget('stable')} className={`px-2 py-1 text-[10px] font-bold rounded ${editModelTarget==='stable'?'bg-white text-emerald-600 shadow-sm':'text-gray-500'}`}>안정형</button>
-                    {/* 🔥 [수정] 레버리지 포션 편집 탭 버튼 추가 */}
                     <button onClick={() => setEditModelTarget('leverage')} className={`px-2 py-1 text-[10px] font-bold rounded ${editModelTarget==='leverage'?'bg-white text-purple-600 shadow-sm':'text-gray-500'}`}>레버리지</button>
                   </div>
                 </div>
               ) : (
-                <label className="block text-xs font-black text-gray-500 mb-1.5 tracking-wider">🔍 내 자산에 종목 담기 (미국 대표 ETF 50종)</label>
+                <label className="block text-xs font-black text-gray-500 mb-1.5 tracking-wider">🔍 내 자산에 종목 담기 (미국/국내 ETF 검색)</label>
               )}
               
               <input 
                 type="text"
-                placeholder="예: 반도체, ACE, S&P500..."
+                placeholder="예: 반도체, ACE, S&P500, QQQ..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setIsDropdownOpen(e.target.value !== ''); }}
                 onFocus={() => { if(searchQuery !== '') setIsDropdownOpen(true); }}
@@ -630,31 +673,40 @@ export default function ArchivePage() {
                   {activeTab === 'checker' && renderTable(finalMappedItems, 'checker')}
                   {activeTab === 'models' && (
                     <div className="flex flex-col gap-8">
-                      <div className="bg-blue-50 p-4 md:p-5 rounded-2xl border border-blue-100 flex flex-col md:flex-row md:items-center gap-4 shadow-sm">
-                        <label className="text-sm md:text-base font-extrabold text-blue-900 whitespace-nowrap">
-                          💰 총 투자 금액 (원)
-                        </label>
-                        <div className="relative w-full max-w-sm">
-                          <input
-                            type="number"
-                            min="0"
-                            value={budget}
-                            onChange={(e) => setBudget(e.target.value)}
-                            placeholder="예: 10000000 (1천만 원)"
-                            className="w-full border border-blue-200 rounded-xl py-2 px-4 pr-10 text-right font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
-                          />
-                          <span className="absolute right-4 top-2 text-gray-500 font-bold text-sm">원</span>
+                      {/* 🔥 [신규 수정] 모델 탭 메인 API 자동 연동 환율 뷰어 및 예산 입력 UI 결합 */}
+                      <div className="bg-blue-50 p-4 md:p-5 rounded-2xl border border-blue-100 flex flex-col gap-3 shadow-sm mb-2">
+                        <div className="flex flex-col md:flex-row md:items-center gap-4">
+                          <label className="text-sm md:text-base font-extrabold text-blue-900 whitespace-nowrap">
+                            💰 총 투자 금액 (원)
+                          </label>
+                          <div className="relative w-full max-w-sm">
+                            <input
+                              type="number"
+                              min="0"
+                              value={budget}
+                              onChange={(e) => setBudget(e.target.value)}
+                              placeholder="예: 10000000 (1천만 원)"
+                              className="w-full border border-blue-200 rounded-xl py-2 px-4 pr-10 text-right font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
+                            />
+                            <span className="absolute right-4 top-2.5 text-gray-500 font-bold text-sm">원</span>
+                          </div>
+                          
+                          <div className="flex items-center justify-between md:justify-start gap-2 bg-white px-3 py-2 rounded-xl border border-blue-100 shadow-sm md:ml-auto">
+                             <label className="text-xs font-bold text-gray-500">🇺🇸 실시간 연동 환율 (USD/KRW)</label>
+                             <div className="flex items-center">
+                                <span className="text-sm font-bold text-blue-600">{exchangeRate.toLocaleString('ko-KR', {maximumFractionDigits: 2})}</span>
+                                <span className="text-xs text-gray-400 ml-1">원</span>
+                             </div>
+                          </div>
                         </div>
                         <span className="text-xs font-semibold text-blue-600/80 break-keep">
-                          * 입력하신 금액에 맞춰 각 포트폴리오의<br className="hidden md:block" />목표 비중에 따른 매수 수량이 자동 계산됩니다.
+                          * 입력하신 금액과 자동 연동된 환율에 맞춰 각 포트폴리오의 목표 비중에 따른 매수 수량이 실시간으로 계산됩니다.
                         </span>
                       </div>
 
                       {renderTable(getMappedItems('aggressive'), 'aggressive', '🔥 공격형 포션')}
                       {renderTable(getMappedItems('neutral'), 'neutral', '⚖️ 중립형 포션')}
                       {renderTable(getMappedItems('stable'), 'stable', '🛡️ 안정형 포션')}
-                      
-                      {/* 🔥 [추가됨] 레버리지 포션 테이블 렌더링 */}
                       {renderTable(getMappedItems('leverage'), 'leverage', '🚀 레버리지 포션')}
                     </div>
                   )}
