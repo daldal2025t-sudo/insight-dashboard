@@ -26,7 +26,7 @@ export async function GET() {
       try {
         // 🔥 TQQQ와 SOXL은 완벽한 실시간 프리/애프터마켓 추적을 위해 v7 Quote API 사용
         if (item.code === 'TQQQ' || item.code === 'SOXL') {
-          const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/quote?symbols=${item.code}`, { cache: 'no-store' });
+          const res = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.code}?interval=1m&range=1d`, { cache: 'no-store' });
           if (!res.ok) throw new Error('Fetch failed');
           const data = await res.json();
           const quote = data.quoteResponse.result[0];
