@@ -3,68 +3,96 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  // 🔥 TQQQ, SOXL이 NASDAQ 바로 다음에 추가되었습니다. 총 8개 지수!
   const symbols = [
-    // 🟢 1. 윗줄: 글로벌 핵심 증시 6대장 (러셀2000 순정 유지!)
     { code: 'ES=F', spotCode: '^GSPC', name: 'S&P 500', suffix: '' },
     { code: 'NQ=F', spotCode: '^IXIC', name: 'NASDAQ', suffix: '' },
+    { code: 'TQQQ', spotCode: 'TQQQ', name: 'TQQQ', suffix: '' },
+    { code: 'SOXL', spotCode: 'SOXL', name: 'SOXL', suffix: '' },
     { code: 'YM=F', spotCode: '^DJI', name: 'DOW JONES', suffix: '' },
-    { code: 'RTY=F', spotCode: '^RUT', name: 'RUSSELL 2000', suffix: '' }, // 러셀 2000 복구 완료!
-    { code: '^KS11', name: 'KOSPI', suffix: '' },
-    { code: '^KQ11', name: 'KOSDAQ', suffix: '' },
+    { code: 'RTY=F', spotCode: '^RUT', name: 'RUSSELL 2000', suffix: '' },
+    { code: '^KS11', spotCode: '^KS11', name: 'KOSPI', suffix: '' },
+    { code: '^KQ11', spotCode: '^KQ11', name: 'KOSDAQ', suffix: '' },
     
-    // 🟢 2. 아랫줄: 외환 및 주요 거시경제 6대장 (VIX를 빼고 반도체 지수 수주!)
-    { code: 'KRW=X', name: '원/달러 환율', suffix: '원' },
-    { code: '^TNX', name: '미국 10년물 국채금리', suffix: '%' },
-    { code: 'CL=F', name: 'WTI 원유', suffix: '달러' },
-    { code: '^SOX', name: 'PHLX SEMICON', suffix: '' }, // 🔥 VIX 공포지수 자리에 반도체 지수 탑재!
-    { code: 'GC=F', name: '국제 금 선물', suffix: '달러' },
-    { code: 'BTC-KRW', name: '비트코인', suffix: '원' }
+    // 거시경제 지표 (총 6개 유지)
+    { code: 'KRW=X', spotCode: 'KRW=X', name: '원/달러 환율', suffix: '원' },
+    { code: '^TNX', spotCode: '^TNX', name: '미국 10년물 국채금리', suffix: '%' },
+    { code: 'CL=F', spotCode: 'CL=F', name: 'WTI 원유', suffix: '달러' },
+    { code: '^SOX', spotCode: '^SOX', name: 'PHLX SEMICON', suffix: '' },
+    { code: 'GC=F', spotCode: 'GC=F', name: '국제 금 선물', suffix: '' },
+    { code: 'BTC-USD', spotCode: 'BTC-USD', name: '비트코인', suffix: '' }
   ];
 
   try {
     const results = await Promise.all(symbols.map(async (item) => {
-      // 1. 메인 지표 파싱
-      const res = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.code}?interval=1m&range=1d`, { cache: 'no-store' });
-      if (!res.ok) throw new Error('Fetch failed');
-      const data = await res.json();
-      const meta = data.chart.result[0].meta;
-      const price = meta.regularMarketPrice;
-      const prev = meta.previousClose;
-      const change = ((price - prev) / prev) * 100;
-      const changeAmt = price - prev; 
+      try {
+        const res = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.code}?interval=1m&range=1d`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('Fetch failed');
+        const data = await res.json();
+        const meta = data.chart.result[0].meta;
+        
+        let price = meta.regularMarketPrice;
+        let prev = meta.previousClose;
+        
+        let spotChangeStr = null;
+        let isSpotUp = null;
 
-      let spotChangeStr = null;
-      let isSpotUp = null;
-
-      // 2. 현물(Spot) 듀얼 파싱 (S&P500, 나스닥, 다우존스, 러셀2000용)
-      if (item.spotCode) {
-        try {
-          const spotRes = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.spotCode}?interval=1m&range=1d`, { cache: 'no-store' });
-          if (spotRes.ok) {
-            const spotData = await spotRes.json();
-            const spotMeta = spotData.chart.result[0].meta;
-            const spotPrice = spotMeta.regularMarketPrice;
-            const spotPrev = spotMeta.previousClose;
-            const spotChange = ((spotPrice - spotPrev) / spotPrev) * 100;
-            spotChangeStr = Math.abs(spotChange).toFixed(2) + '%';
-            isSpotUp = spotChange >= 0;
+        // 🔥 TQQQ, SOXL 전용 로직: 프리마켓/애프터마켓을 '선물'로, 정규장을 '현물'로 처리
+        if (item.code === 'TQQQ' || item.code === 'SOXL') {
+          const extPrice = meta.preMarketPrice || meta.postMarketPrice;
+          
+          if (extPrice && extPrice !== price) {
+            // 시간외 거래가 있을 경우 -> 정규장을 현물 배지로 밀어냄
+            const spotChangeRaw = ((price - prev) / prev) * 100;
+            spotChangeStr = (spotChangeRaw > 0 ? '+' : '') + spotChangeRaw.toFixed(2) + '%';
+            isSpotUp = spotChangeRaw >= 0;
+            
+            // 메인 지표는 시간외 가격으로 변경 (시간외 변동률은 정규장 종가 대비로 계산)
+            prev = price; 
+            price = extPrice; 
+          } else {
+            // 시간외 거래가 없을 경우 (정규장 시간)
+            const spotChangeRaw = ((price - prev) / prev) * 100;
+            spotChangeStr = (spotChangeRaw > 0 ? '+' : '') + spotChangeRaw.toFixed(2) + '%';
+            isSpotUp = spotChangeRaw >= 0;
           }
-        } catch (e) {
-          console.error(`Spot fetch error for ${item.spotCode}`, e);
+        } 
+        // 일반 지수들 (S&P500, 나스닥 등)의 현물 데이터 파싱
+        else if (item.spotCode && item.code !== item.spotCode) {
+          try {
+            const spotRes = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.spotCode}?interval=1m&range=1d`, { cache: 'no-store' });
+            if (spotRes.ok) {
+              const spotData = await spotRes.json();
+              const spotMeta = spotData.chart.result[0].meta;
+              const spotPrice = spotMeta.regularMarketPrice;
+              const spotPrev = spotMeta.previousClose;
+              const spotChangeRaw = ((spotPrice - spotPrev) / spotPrev) * 100;
+              spotChangeStr = (spotChangeRaw > 0 ? '+' : '') + spotChangeRaw.toFixed(2) + '%';
+              isSpotUp = spotChangeRaw >= 0;
+            }
+          } catch(e) {}
         }
-      }
 
-      return {
-        name: item.name,
-        value: price.toLocaleString('ko-KR', { maximumFractionDigits: 2 }),
-        change: Math.abs(change).toFixed(2) + '%',
-        changeAmt: Math.abs(changeAmt).toLocaleString('ko-KR', { maximumFractionDigits: 2 }),
-        isUp: change >= 0,
-        suffix: item.suffix,
-        spotChange: spotChangeStr, 
-        isSpotUp: isSpotUp
-      };
+        const change = ((price - prev) / prev) * 100;
+        const changeAmt = price - prev;
+        
+        let displayValue = price.toLocaleString('en-US', { maximumFractionDigits: 2 });
+        if (item.code === 'BTC-USD') displayValue = price.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        
+        return { 
+          ...item, 
+          value: displayValue, 
+          change: (change > 0 ? '+' : '') + change.toFixed(2) + '%', 
+          changeAmt: (changeAmt > 0 ? '+' : '') + changeAmt.toLocaleString('en-US', { maximumFractionDigits: 2 }), 
+          isUp: change >= 0,
+          spotChange: spotChangeStr,
+          isSpotUp: isSpotUp
+        };
+      } catch (e) {
+        return { ...item, value: '-', change: '-', changeAmt: '0', isUp: null };
+      }
     }));
+
     return NextResponse.json(results);
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });

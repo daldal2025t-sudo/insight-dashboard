@@ -63,30 +63,25 @@ function StockTicker() {
 
   useEffect(() => { fetchStocks(); }, []);
 
-  const defaultStocks = Array(6).fill({ name: '-', value: '-', change: '-', changeAmt: '0', isUp: null });
+  // 🔥 상단 증시가 8개로 늘어남에 따라 Array 크기를 8개로 조정
+  const defaultStocks = Array(8).fill({ name: '-', value: '-', change: '-', changeAmt: '0', isUp: null });
   const defaultMacros = Array(6).fill({ name: '-', value: '-', change: '-', changeAmt: '0', isUp: null });
 
-  const line1Stocks = liveData && liveData.length >= 6 ? liveData.slice(0, 6) : defaultStocks;
-  const line2Macros = liveData && liveData.length >= 6 ? liveData.slice(6) : defaultMacros;
+  // 🔥 8개 슬라이스로 변경
+  const line1Stocks = liveData && liveData.length >= 8 ? liveData.slice(0, 8) : defaultStocks;
+  const line2Macros = liveData && liveData.length >= 14 ? liveData.slice(8, 14) : defaultMacros;
 
   const renderItem = (item, index) => (
     <div key={index} className="p-3 md:p-4 border-b md:border-b-0 md:border-r border-white flex flex-col justify-between bg-gray-100 hover:bg-gray-200 transition cursor-default">
       <span className="text-xs md:text-sm font-bold text-gray-800 mb-2 truncate">{item.name}</span>
-      
-      {/* 💡 gap-2를 gap-1로 줄여서 좌우 여유 공간 확보 */}
       <div className="flex justify-between items-end gap-1">
-        
-        {/* 💡 md:text-lg를 md:text-base로 낮춰서 글자 크기 최적화 및 우측 여백(pr-1) 제거 */}
         <span className="text-sm md:text-base font-extrabold tracking-tighter text-gray-900 leading-none truncate">
           {item.value}<span className="text-[10px] md:text-xs font-normal ml-0.5 text-gray-500">{item.suffix || ''}</span>
         </span>
-        
         <div className="flex flex-col items-end gap-1 shrink-0">
           <div className="flex items-center gap-0.5 md:gap-1 leading-none">
             {item.isUp === true && <svg className="w-3 h-3 md:w-3.5 md:h-3.5 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
             {item.isUp === false && <svg className="w-3 h-3 md:w-3.5 md:h-3.5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
-            
-            {/* 💡 변동폭 텍스트 크기도 md:text-sm에서 md:text-xs로 조정 */}
             <span className={`text-[10px] md:text-xs font-semibold ${item.isUp === true ? 'text-pink-600' : item.isUp === false ? 'text-blue-500' : 'text-gray-500'}`}>
               {item.changeAmt && `${item.changeAmt} `}({item.change})
             </span>
@@ -114,7 +109,8 @@ function StockTicker() {
           <h2 className="text-sm md:text-base font-bold tracking-tight">글로벌 핵심 증시 (선물/현물 듀얼)</h2>
           <button onClick={fetchStocks} className="text-xs bg-gray-600 hover:bg-gray-700 px-3 py-1.5 rounded-md transition flex items-center gap-1">↻ 다시 로딩</button>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-6 border-x border-b border-gray-200 rounded-b-xl overflow-hidden">
+        {/* 🔥 그리드 수정: 모바일 2칸, 태블릿 4칸(2줄), 초광각 모니터 8칸(1줄) 배열 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 border-x border-b border-gray-200 rounded-b-xl overflow-hidden">
           {line1Stocks.map((stock, index) => renderItem(stock, index))}
         </div>
       </div>
@@ -146,7 +142,6 @@ export default function Home() {
         <StockTicker />
         <section className="bg-black text-white rounded-2xl p-6 shadow-lg mb-12">
           <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-            {/* 1층 */}
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-red-400 font-bold text-xs bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">Global</span>
               <a href="https://www.hankyung.com/globalmarket/global-equity-market" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 글로벌마켓</a>
@@ -155,19 +150,10 @@ export default function Home() {
               <span className="text-blue-400 font-bold text-xs bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900 min-w-[56px] text-center">Korea</span>
               <a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 코리안마켓</a>
             </li>
-            
-            {/* 💡 [주석 처리] 블로그 버튼 임시 비활성화 */}
-            {/* <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
-              <span className="text-orange-400 font-bold text-xs bg-orange-950/50 px-2 py-0.5 rounded border border-orange-900 min-w-[56px] text-center">Blog</span>
-              <a href="https://blog.naver.com/good-day-go" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Good Day Go</a>
-            </li> 
-            */}
 
-            {/* 2층 (블로그 비활성화로 인해 자연스럽게 배열이 당겨집니다) */}
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
-              {/* 🔥 여기서 뱃지 텍스트를 Index로 변경했습니다! */}
               <span className="text-pink-400 font-bold text-xs bg-pink-950/50 px-2 py-0.5 rounded border border-pink-900 min-w-[56px] text-center">Index</span>
-              <a href="https://www.indexergo.com/index?group=usa" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Indexergo</a>
+              <a href="https://www.indexergo.com/index?group=usa" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Indexergo Map</a>
             </li>
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-purple-400 font-bold text-xs bg-purple-950/50 px-2 py-0.5 rounded border border-purple-900 min-w-[56px] text-center">StockA</span>
@@ -178,7 +164,6 @@ export default function Home() {
               <a href="https://institutional.fidelity.com/app/item/RD_13569_40890.html" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">경기사이클</a>
             </li>
 
-            {/* 3층 */}
             <li className="flex gap-4 items-center pt-2">
               <span className="text-emerald-400 font-bold text-xs bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900 min-w-[56px] text-center">FED</span>
               <a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">FED 점도표</a>
