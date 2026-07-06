@@ -24,68 +24,38 @@ export async function GET() {
   try {
     const results = await Promise.all(symbols.map(async (item) => {
       try {
-        const res = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.code}?interval=1m&range=1d`, { cache: 'no-store' });
+        // 🔥 실시간 데이터가 가장 풍부한 Quote API로 교체
+        const res = await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${item.code}`, { cache: 'no-store' });
         if (!res.ok) throw new Error('Fetch failed');
         const data = await res.json();
-        const meta = data.chart.result[0].meta;
+        const quote = data.quoteResponse.result[0];
         
-        let price = meta.regularMarketPrice;
-        let prev = meta.previousClose;
-        
-        let spotChangeStr = null;
-        let isSpotUp = null;
+        let price = quote.regularMarketPrice;
+        let changePercent = quote.regularMarketChangePercent;
+        let changeAmt = quote.regularMarketChange;
+        let isUp = changePercent >= 0;
 
-        // 🔥 TQQQ, SOXL 전용: 프리/애프터마켓 가격 실시간 추적
-        if (item.code === 'TQQQ' || item.code === 'SOXL') {
-          // 야후 파이낸스의 시간외 가격(Post-market 또는 Pre-market) 추출
-          const extPrice = meta.postMarketPrice || meta.preMarketPrice;
-          
-          if (extPrice && extPrice !== price) {
-            // 시간외 거래 진행 중: 현물 뱃지에는 정규장 종가 변동률 표시
-            const spotChangeRaw = ((price - prev) / prev) * 100;
-            spotChangeStr = (spotChangeRaw > 0 ? '+' : '') + spotChangeRaw.toFixed(2) + '%';
-            isSpotUp = spotChangeRaw >= 0;
-            
-            // 메인 전광판 가격을 시간외 거래 가격으로 덮어쓰기
-            prev = price; // 시간외 변동률은 '정규장 종가' 대비로 계산해야 함
-            price = extPrice; 
-          } else {
-            // 정규장 시간: 현물 뱃지와 메인 가격 동기화
-            const spotChangeRaw = ((price - prev) / prev) * 100;
-            spotChangeStr = (spotChangeRaw > 0 ? '+' : '') + spotChangeRaw.toFixed(2) + '%';
-            isSpotUp = spotChangeRaw >= 0;
-          }
-        } 
-        // 일반 지수들 현물 데이터 파싱
-        else if (item.spotCode && item.code !== item.spotCode) {
-          try {
-            const spotRes = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.spotCode}?interval=1m&range=1d`, { cache: 'no-store' });
-            if (spotRes.ok) {
-              const spotData = await spotRes.json();
-              const spotMeta = spotData.chart.result[0].meta;
-              const spotPrice = spotMeta.regularMarketPrice;
-              const spotPrev = spotMeta.previousClose;
-              const spotChangeRaw = ((spotPrice - spotPrev) / spotPrev) * 100;
-              spotChangeStr = (spotChangeRaw > 0 ? '+' : '') + spotChangeRaw.toFixed(2) + '%';
-              isSpotUp = spotChangeRaw >= 0;
-            }
-          } catch(e) {}
+        // 🔥 장외 거래(Pre/Post)가 활성화되어 있으면 해당 가격을 우선 표시
+        if (quote.preMarketPrice && quote.preMarketPrice !== 0) {
+            price = quote.preMarketPrice;
+            changePercent = quote.preMarketChangePercent;
+            changeAmt = quote.preMarketChange;
+            isUp = changePercent >= 0;
+        } else if (quote.postMarketPrice && quote.postMarketPrice !== 0) {
+            price = quote.postMarketPrice;
+            changePercent = quote.postMarketChangePercent;
+            changeAmt = quote.postMarketChange;
+            isUp = changePercent >= 0;
         }
-
-        const change = ((price - prev) / prev) * 100;
-        const changeAmt = price - prev;
-        
-        let displayValue = price.toLocaleString('en-US', { maximumFractionDigits: 2 });
-        if (item.code === 'BTC-USD') displayValue = price.toLocaleString('en-US', { maximumFractionDigits: 0 });
         
         return { 
           ...item, 
-          value: displayValue, 
-          change: (change > 0 ? '+' : '') + change.toFixed(2) + '%', 
+          value: price.toLocaleString('en-US', { maximumFractionDigits: 2 }), 
+          change: (changePercent > 0 ? '+' : '') + changePercent.toFixed(2) + '%', 
           changeAmt: (changeAmt > 0 ? '+' : '') + changeAmt.toLocaleString('en-US', { maximumFractionDigits: 2 }), 
-          isUp: change >= 0,
-          spotChange: spotChangeStr,
-          isSpotUp: isSpotUp
+          isUp: isUp,
+          spotChange: (quote.regularMarketChangePercent > 0 ? '+' : '') + quote.regularMarketChangePercent.toFixed(2) + '%',
+          isSpotUp: quote.regularMarketChangePercent >= 0
         };
       } catch (e) {
         return { ...item, value: '-', change: '-', changeAmt: '0', isUp: null };
