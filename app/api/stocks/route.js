@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  // 🔥 TQQQ, SOXL이 NASDAQ 바로 다음에 추가되었습니다. 총 8개 지수!
   const symbols = [
     { code: 'ES=F', spotCode: '^GSPC', name: 'S&P 500', suffix: '' },
     { code: 'NQ=F', spotCode: '^IXIC', name: 'NASDAQ', suffix: '' },
@@ -14,7 +13,6 @@ export async function GET() {
     { code: '^KS11', spotCode: '^KS11', name: 'KOSPI', suffix: '' },
     { code: '^KQ11', spotCode: '^KQ11', name: 'KOSDAQ', suffix: '' },
     
-    // 거시경제 지표 (총 6개 유지)
     { code: 'KRW=X', spotCode: 'KRW=X', name: '원/달러 환율', suffix: '원' },
     { code: '^TNX', spotCode: '^TNX', name: '미국 10년물 국채금리', suffix: '%' },
     { code: 'CL=F', spotCode: 'CL=F', name: 'WTI 원유', suffix: '달러' },
@@ -37,27 +35,28 @@ export async function GET() {
         let spotChangeStr = null;
         let isSpotUp = null;
 
-        // 🔥 TQQQ, SOXL 전용 로직: 프리마켓/애프터마켓을 '선물'로, 정규장을 '현물'로 처리
+        // 🔥 TQQQ, SOXL 전용: 프리/애프터마켓 가격 실시간 추적
         if (item.code === 'TQQQ' || item.code === 'SOXL') {
-          const extPrice = meta.preMarketPrice || meta.postMarketPrice;
+          // 야후 파이낸스의 시간외 가격(Post-market 또는 Pre-market) 추출
+          const extPrice = meta.postMarketPrice || meta.preMarketPrice;
           
           if (extPrice && extPrice !== price) {
-            // 시간외 거래가 있을 경우 -> 정규장을 현물 배지로 밀어냄
+            // 시간외 거래 진행 중: 현물 뱃지에는 정규장 종가 변동률 표시
             const spotChangeRaw = ((price - prev) / prev) * 100;
             spotChangeStr = (spotChangeRaw > 0 ? '+' : '') + spotChangeRaw.toFixed(2) + '%';
             isSpotUp = spotChangeRaw >= 0;
             
-            // 메인 지표는 시간외 가격으로 변경 (시간외 변동률은 정규장 종가 대비로 계산)
-            prev = price; 
+            // 메인 전광판 가격을 시간외 거래 가격으로 덮어쓰기
+            prev = price; // 시간외 변동률은 '정규장 종가' 대비로 계산해야 함
             price = extPrice; 
           } else {
-            // 시간외 거래가 없을 경우 (정규장 시간)
+            // 정규장 시간: 현물 뱃지와 메인 가격 동기화
             const spotChangeRaw = ((price - prev) / prev) * 100;
             spotChangeStr = (spotChangeRaw > 0 ? '+' : '') + spotChangeRaw.toFixed(2) + '%';
             isSpotUp = spotChangeRaw >= 0;
           }
         } 
-        // 일반 지수들 (S&P500, 나스닥 등)의 현물 데이터 파싱
+        // 일반 지수들 현물 데이터 파싱
         else if (item.spotCode && item.code !== item.spotCode) {
           try {
             const spotRes = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.spotCode}?interval=1m&range=1d`, { cache: 'no-store' });

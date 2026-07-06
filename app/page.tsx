@@ -63,11 +63,9 @@ function StockTicker() {
 
   useEffect(() => { fetchStocks(); }, []);
 
-  // 🔥 상단 증시가 8개로 늘어남에 따라 Array 크기를 8개로 조정
   const defaultStocks = Array(8).fill({ name: '-', value: '-', change: '-', changeAmt: '0', isUp: null });
   const defaultMacros = Array(6).fill({ name: '-', value: '-', change: '-', changeAmt: '0', isUp: null });
 
-  // 🔥 8개 슬라이스로 변경
   const line1Stocks = liveData && liveData.length >= 8 ? liveData.slice(0, 8) : defaultStocks;
   const line2Macros = liveData && liveData.length >= 14 ? liveData.slice(8, 14) : defaultMacros;
 
@@ -75,7 +73,7 @@ function StockTicker() {
     <div key={index} className="p-3 md:p-4 border-b md:border-b-0 md:border-r border-white flex flex-col justify-between bg-gray-100 hover:bg-gray-200 transition cursor-default">
       <span className="text-xs md:text-sm font-bold text-gray-800 mb-2 truncate">{item.name}</span>
       <div className="flex justify-between items-end gap-1">
-        <span className="text-sm md:text-base font-extrabold tracking-tighter text-gray-900 leading-none truncate">
+        <span className="text-sm md:text-base font-extrabold tracking-tighter text-gray-900 leading-none truncate pr-1">
           {item.value}<span className="text-[10px] md:text-xs font-normal ml-0.5 text-gray-500">{item.suffix || ''}</span>
         </span>
         <div className="flex flex-col items-end gap-1 shrink-0">
@@ -109,8 +107,8 @@ function StockTicker() {
           <h2 className="text-sm md:text-base font-bold tracking-tight">글로벌 핵심 증시 (선물/현물 듀얼)</h2>
           <button onClick={fetchStocks} className="text-xs bg-gray-600 hover:bg-gray-700 px-3 py-1.5 rounded-md transition flex items-center gap-1">↻ 다시 로딩</button>
         </div>
-        {/* 🔥 그리드 수정: 모바일 2칸, 태블릿 4칸(2줄), 초광각 모니터 8칸(1줄) 배열 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 border-x border-b border-gray-200 rounded-b-xl overflow-hidden">
+        {/* 🔥 그리드 수정: 모바일 2칸, 태블릿 및 PC 4칸(무조건 2줄 배열) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 border-x border-b border-gray-200 rounded-b-xl overflow-hidden">
           {line1Stocks.map((stock, index) => renderItem(stock, index))}
         </div>
       </div>
@@ -118,6 +116,7 @@ function StockTicker() {
         <div className="bg-slate-700 text-white px-4 py-2 flex justify-between items-center rounded-t-xl">
           <h2 className="text-sm md:text-base font-bold tracking-tight">외환 및 주요 거시경제 지표</h2>
         </div>
+        {/* 거시경제 지표는 6개이므로 3개씩 2줄 배열 최적화 */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 border-x border-b border-gray-200 rounded-b-xl overflow-hidden">
           {line2Macros.map((macro, index) => renderItem(macro, index))}
         </div>
