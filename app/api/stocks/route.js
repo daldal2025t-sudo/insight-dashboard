@@ -38,7 +38,7 @@ export async function GET() {
 
           return { ...item, value: price.toLocaleString('en-US', {maximumFractionDigits:2}), change: (change > 0 ? '+' : '') + change.toFixed(2) + '%', changeAmt: (changeAmt > 0 ? '+' : '') + changeAmt.toFixed(2), isUp: change >= 0 };
         } 
-        // 2. 나머지 지표: Chart API로 안정적 수집
+        // 2. 나머지 지표: Chart API로 안정적 수집 ok
         else {
           const res = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.code}?interval=1m&range=1d`, { cache: 'no-store' });
           const data = await res.json();
