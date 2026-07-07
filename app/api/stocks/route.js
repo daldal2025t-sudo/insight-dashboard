@@ -22,14 +22,22 @@ export async function GET() {
   ];
 
   const fetchData = async (item) => {
+    // 🔥 야후 파이낸스 차단 방지를 위한 브라우저 우회 헤더 추가
+    const fetchOptions = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json'
+      },
+      cache: 'no-store'
+    };
+
     try {
-      // 🔥 1. ETF(TQQQ, SOXL)는 실시간 프리/애프터마켓 가격을 위해 V7 Quote API 사용
+      // 1. ETF(TQQQ, SOXL) - V7 API (실시간 프리/애프터마켓 반영)
       if (item.type === 'etf') {
-        const res = await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${item.code}`, { cache: 'no-store' });
+        const res = await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${item.code}`, fetchOptions);
         if (!res.ok) throw new Error('Quote API Fetch failed');
         const data = await res.json();
         
-        // 💡 방어 코드: 데이터가 아예 없을 경우를 대비 (에러 방지)
         const quote = data?.quoteResponse?.result?.[0];
         if (!quote) throw new Error('No quote data found');
 
@@ -48,7 +56,7 @@ export async function GET() {
             changeAmt = quote.postMarketChange;
         }
 
-        // 현물 배지에 들어갈 정규장 종가 기준 데이터
+        // 현물 배지용 정규장 종가 데이터
         const spotChangeRaw = quote.regularMarketChangePercent || 0;
         const spotChange = (spotChangeRaw > 0 ? '+' : '') + spotChangeRaw.toFixed(2) + '%';
 
@@ -63,9 +71,9 @@ export async function GET() {
           suffix: item.suffix || ''
         };
       } 
-      // 2. 일반 지수(선물, 환율 등)는 안정적인 V8 Chart API 사용
+      // 2. 일반 지수(선물, 환율 등) - V8 API (안정성)
       else {
-        const res = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.code}?interval=1m&range=1d`, { cache: 'no-store' });
+        const res = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.code}?interval=1m&range=1d`, fetchOptions);
         if (!res.ok) throw new Error('Chart API Fetch failed');
         const data = await res.json();
         const meta = data?.chart?.result?.[0]?.meta;
@@ -79,10 +87,10 @@ export async function GET() {
         let spotChange = null;
         let isSpotUp = null;
 
-        // 현물 지수 데이터가 필요한 경우 (예: ES=F 선물의 현물 ^GSPC)
+        // 현물 지수 데이터 파싱
         if (item.spotCode && item.code !== item.spotCode) {
           try {
-            const sRes = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.spotCode}?interval=1m&range=1d`, { cache: 'no-store' });
+            const sRes = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${item.spotCode}?interval=1m&range=1d`, fetchOptions);
             const sData = await sRes.json();
             const sMeta = sData?.chart?.result?.[0]?.meta;
             if (sMeta) {
@@ -90,9 +98,7 @@ export async function GET() {
                 spotChange = (sChange > 0 ? '+' : '') + sChange.toFixed(2) + '%';
                 isSpotUp = sChange >= 0;
             }
-          } catch(e) {
-              // 현물 파싱 에러는 무시하고 계속 진행
-          }
+          } catch(e) { }
         }
 
         return {
