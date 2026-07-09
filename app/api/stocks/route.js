@@ -46,36 +46,49 @@ export async function GET() {
       if (item.type === 'etf') {
         const meta = await fetchChartMeta(item.code, true);
 
-        let price = meta.regularMarketPrice;
-        let prev = meta.previousClose ?? meta.chartPreviousClose;
-        let changePercent = prev ? ((price - prev) / prev) * 100 : 0;
-        let changeAmt = prev ? price - prev : 0;
+        const prev = meta.previousClose ?? meta.chartPreviousClose; // 전일 정규장 종가
+        const regularPrice = meta.regularMarketPrice;               // 당일 정규장 (진행중이면 현재가, 끝났으면 종가)
+        const state = meta.marketState; // 'PRE' | 'PREPRE' | 'REGULAR' | 'POST' | 'POSTPOST' | 'CLOSED'
 
-        // 장외 거래(프리/애프터) 가격이 존재하면 덮어씌움
-        if (meta.preMarketPrice) {
-          const preChange = ((meta.preMarketPrice - price) / price) * 100;
+        let price, changePercent, changeAmt;
+
+        if (state === 'PRE' && meta.preMarketPrice != null) {
+          // 프리마켓 진행중: 전일 종가 대비 등락
           price = meta.preMarketPrice;
-          changePercent = preChange;
-          changeAmt = meta.preMarketChange ?? (meta.preMarketPrice - (meta.regularMarketPrice ?? 0));
-        } else if (meta.postMarketPrice) {
-          const postChange = ((meta.postMarketPrice - price) / price) * 100;
+          changePercent = meta.preMarketChangePercent ?? (prev ? ((price - prev) / prev) * 100 : 0);
+          changeAmt = meta.preMarketChange ?? (prev ? price - prev : 0);
+        } else if (state === 'POST' && meta.postMarketPrice != null) {
+          // 애프터마켓 진행중: 당일 정규장 종가 대비 등락
           price = meta.postMarketPrice;
-          changePercent = postChange;
-          changeAmt = meta.postMarketChange ?? (meta.postMarketPrice - (meta.regularMarketPrice ?? 0));
+          changePercent = meta.postMarketChangePercent ?? (regularPrice ? ((price - regularPrice) / regularPrice) * 100 : 0);
+          changeAmt = meta.postMarketChange ?? (price - regularPrice);
+        } else if (state === 'REGULAR') {
+          // 정규장 진행중
+          price = regularPrice;
+          changePercent = prev ? ((price - prev) / prev) * 100 : 0;
+          changeAmt = prev ? price - prev : 0;
+        } else {
+          // PREPRE(개장 전 새벽) / POSTPOST(애프터 종료 후) / CLOSED(주말·휴장)
+          // -> 애프터마켓 마지막 가격이 있으면 그걸, 없으면 정규장 종가를 보여줌 (실제로 거래가 없는 구간이라 고정되는 게 정상)
+          price = meta.postMarketPrice ?? regularPrice;
+          const base = meta.postMarketPrice ? regularPrice : prev;
+          changePercent = meta.postMarketChangePercent ?? (base ? ((price - base) / base) * 100 : 0);
+          changeAmt = meta.postMarketChange ?? (base ? price - base : 0);
         }
 
-        // 현물 배지용 정규장 종가 기준 등락률
-        const spotChangeRaw = prev ? ((meta.regularMarketPrice - prev) / prev) * 100 : 0;
+        // 현물 배지용: 정규장 종가 기준 등락률
+        const spotChangeRaw = prev ? ((regularPrice - prev) / prev) * 100 : 0;
         const spotChange = (spotChangeRaw > 0 ? '+' : '') + spotChangeRaw.toFixed(2) + '%';
 
         return {
           name: item.name,
           value: price ? price.toLocaleString('en-US', { maximumFractionDigits: 2 }) : '-',
-          change: changePercent ? (changePercent > 0 ? '+' : '') + changePercent.toFixed(2) + '%' : '0.00%',
-          changeAmt: changeAmt ? (changeAmt > 0 ? '+' : '') + changeAmt.toFixed(2) : '0',
+          change: changePercent != null ? (changePercent > 0 ? '+' : '') + changePercent.toFixed(2) + '%' : '0.00%',
+          changeAmt: changeAmt != null ? (changeAmt > 0 ? '+' : '') + changeAmt.toFixed(2) : '0',
           isUp: changePercent >= 0,
           spotChange: spotChange,
           isSpotUp: spotChangeRaw >= 0,
+          marketState: state,
           suffix: item.suffix || ''
         };
       }
