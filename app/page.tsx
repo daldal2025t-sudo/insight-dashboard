@@ -107,7 +107,6 @@ function StockTicker() {
           <h2 className="text-sm md:text-base font-bold tracking-tight">글로벌 핵심 증시 (선물/현물 듀얼)</h2>
           <button onClick={fetchStocks} className="text-xs bg-gray-600 hover:bg-gray-700 px-3 py-1.5 rounded-md transition flex items-center gap-1">↻ 다시 로딩</button>
         </div>
-        {/* 🔥 그리드 수정: 모바일 2칸, 태블릿 및 PC 4칸(무조건 2줄 배열) */}
         <div className="grid grid-cols-2 md:grid-cols-4 border-x border-b border-gray-200 rounded-b-xl overflow-hidden">
           {line1Stocks.map((stock, index) => renderItem(stock, index))}
         </div>
@@ -116,7 +115,6 @@ function StockTicker() {
         <div className="bg-slate-700 text-white px-4 py-2 flex justify-between items-center rounded-t-xl">
           <h2 className="text-sm md:text-base font-bold tracking-tight">외환 및 주요 거시경제 지표</h2>
         </div>
-        {/* 거시경제 지표는 6개이므로 3개씩 2줄 배열 최적화 */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 border-x border-b border-gray-200 rounded-b-xl overflow-hidden">
           {line2Macros.map((macro, index) => renderItem(macro, index))}
         </div>
@@ -128,13 +126,21 @@ function StockTicker() {
 export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
-      <header className="max-w-7xl mx-auto mb-8 flex justify-between items-center">
+      <header className="max-w-7xl mx-auto mb-8 flex justify-between items-center border-b border-gray-200 pb-6">
         <div>
           <p className="text-blue-600 font-bold text-sm tracking-wider">NEWS CURATION PLATFORM</p>
           <h1 className="text-2xl md:text-4xl font-extrabold text-gray-900 mt-1 mb-2">KIJAY Daily Insight</h1>
           <p className="text-gray-500 text-xs md:text-sm">실시간 경제 및 글로벌 자산 시장의 핵심 지표를 트래킹하는 금융 대시보드입니다.</p>
         </div>
-        <Link href="/archive" className="bg-black text-white px-4 py-2 md:px-5 md:py-2 rounded-full font-bold text-xs md:text-sm hover:bg-gray-800 transition shadow-md shrink-0">포트폴리오 빌더 →</Link>
+        {/* 🔥 독립형 버튼 네비게이션 배치 */}
+        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+          <Link href="/infinite" className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-5 py-2.5 rounded-full font-bold text-xs md:text-sm hover:opacity-90 transition shadow-md flex items-center gap-1">
+            📈 무한 매수법 추적기 →
+          </Link>
+          <Link href="/archive" className="bg-black text-white px-5 py-2.5 rounded-full font-bold text-xs md:text-sm hover:bg-gray-800 transition shadow-md flex items-center gap-1">
+            📚 포트폴리오 빌더 →
+          </Link>
+        </div>
       </header>
       
       <main className="max-w-7xl mx-auto">
@@ -149,7 +155,6 @@ export default function Home() {
               <span className="text-blue-400 font-bold text-xs bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900 min-w-[56px] text-center">Korea</span>
               <a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 코리안마켓</a>
             </li>
-
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-pink-400 font-bold text-xs bg-pink-950/50 px-2 py-0.5 rounded border border-pink-900 min-w-[56px] text-center">Index</span>
               <a href="https://www.indexergo.com/index?group=usa" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Indexergo Map</a>
@@ -162,7 +167,6 @@ export default function Home() {
               <span className="text-amber-400 font-bold text-xs bg-amber-950/50 px-2 py-0.5 rounded border border-amber-900 min-w-[56px] text-center">Cycle</span>
               <a href="https://institutional.fidelity.com/app/item/RD_13569_40890.html" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">경기사이클</a>
             </li>
-
             <li className="flex gap-4 items-center pt-2">
               <span className="text-emerald-400 font-bold text-xs bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900 min-w-[56px] text-center">FED</span>
               <a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">FED 점도표</a>
