@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  // 🔥 1. 순서 변경: 다우, 러셀 다음에 TQQQ, SOXL이 오도록 배열 순서를 조정했습니다.
+  // 🔥 배열 순서: 다우, 러셀 다음에 TQQQ, SOXL 유지
   const symbols = [
     { code: 'ES=F', spotCode: '^GSPC', name: 'S&P 500', type: 'index' },
     { code: 'NQ=F', spotCode: '^IXIC', name: 'NASDAQ', type: 'index' },
@@ -30,7 +30,6 @@ export async function GET() {
     cache: 'no-store'
   };
 
-  // 공통: v8 chart API 호출 헬퍼
   const fetchChartMeta = async (code, includePrePost = false) => {
     const url = `https://query2.finance.yahoo.com/v8/finance/chart/${code}?interval=1m&range=1d${includePrePost ? '&includePrePost=true' : ''}`;
     const res = await fetch(url, fetchOptions);
@@ -43,85 +42,77 @@ export async function GET() {
 
   const fetchData = async (item) => {
     try {
-      // 1. ETF(TQQQ, SOXL) - v8 chart API로 통일 (v7 quote는 crumb 인증 필요해서 자주 막힘)
+      const meta = await fetchChartMeta(item.code, item.type === 'etf');
+
+      // 🔥 NaN 버그 해결의 핵심: 야후 API가 previousClose를 주지 않을 때 chartPreviousClose로 강제 대체
+      let price = meta.regularMarketPrice ?? meta.chartPreviousClose ?? 0;
+      let prev = meta.previousClose ?? meta.chartPreviousClose ?? price;
+      
+      let changePercent = 0;
+      let changeAmt = 0;
+
+      // 1. ETF (프리장/애프터장 반영)
       if (item.type === 'etf') {
-        const meta = await fetchChartMeta(item.code, true);
-
-        const prev = meta.previousClose ?? meta.chartPreviousClose; // 전일 정규장 종가
-        const regularPrice = meta.regularMarketPrice;               // 당일 정규장 (진행중이면 현재가, 끝났으면 종가)
-        const state = meta.marketState; // 'PRE' | 'PREPRE' | 'REGULAR' | 'POST' | 'POSTPOST' | 'CLOSED'
-
-        let price, changePercent, changeAmt;
-
+        const state = meta.marketState;
         if (state === 'PRE' && meta.preMarketPrice != null) {
-          // 프리마켓 진행중: 전일 종가 대비 등락
           price = meta.preMarketPrice;
           changePercent = meta.preMarketChangePercent ?? (prev ? ((price - prev) / prev) * 100 : 0);
-          changeAmt = meta.preMarketChange ?? (prev ? price - prev : 0);
+          changeAmt = meta.preMarketChange ?? (price - prev);
         } else if (state === 'POST' && meta.postMarketPrice != null) {
-          // 애프터마켓 진행중: 당일 정규장 종가 대비 등락
+          const base = meta.regularMarketPrice ?? prev;
           price = meta.postMarketPrice;
-          changePercent = meta.postMarketChangePercent ?? (regularPrice ? ((price - regularPrice) / regularPrice) * 100 : 0);
-          changeAmt = meta.postMarketChange ?? (price - regularPrice);
-        } else if (state === 'REGULAR') {
-          // 정규장 진행중
-          price = regularPrice;
-          changePercent = prev ? ((price - prev) / prev) * 100 : 0;
-          changeAmt = prev ? price - prev : 0;
-        } else {
-          // PREPRE(개장 전 새벽) / POSTPOST(애프터 종료 후) / CLOSED(주말·휴장)
-          // -> 애프터마켓 마지막 가격이 있으면 그걸, 없으면 정규장 종가를 보여줌 (실제로 거래가 없는 구간이라 고정되는 게 정상)
-          price = meta.postMarketPrice ?? regularPrice;
-          const base = meta.postMarketPrice ? regularPrice : prev;
           changePercent = meta.postMarketChangePercent ?? (base ? ((price - base) / base) * 100 : 0);
-          changeAmt = meta.postMarketChange ?? (base ? price - base : 0);
+          changeAmt = meta.postMarketChange ?? (price - base);
+        } else {
+          changePercent = prev ? ((price - prev) / prev) * 100 : 0;
+          changeAmt = price - prev;
         }
-
-        return {
-          name: item.name,
-          value: price ? price.toLocaleString('en-US', { maximumFractionDigits: 2 }) : '-',
-          change: changePercent != null ? (changePercent > 0 ? '+' : '') + changePercent.toFixed(2) + '%' : '0.00%',
-          changeAmt: changeAmt != null ? (changeAmt > 0 ? '+' : '') + changeAmt.toFixed(2) : '0',
-          isUp: changePercent >= 0,
-          // 🔥 2. 현물 배지 삭제: null로 처리하여 프론트엔드에서 등락률이 두 개 나오지 않게 막음
-          spotChange: null, 
-          isSpotUp: null,
-          marketState: state,
-          suffix: item.suffix || ''
-        };
-      }
-      // 2. 일반 지수(선물, 환율 등) - V8 API (안정성)
+      } 
+      // 2. 일반 지수
       else {
-        const meta = await fetchChartMeta(item.code);
-
-        const price = meta.regularMarketPrice;
-        const prev = meta.previousClose;
-        const change = ((price - prev) / prev) * 100;
-
-        let spotChange = null;
-        let isSpotUp = null;
-
-        // 현물 지수 데이터 파싱
-        if (item.spotCode && item.code !== item.spotCode) {
-          try {
-            const sMeta = await fetchChartMeta(item.spotCode);
-            const sChange = ((sMeta.regularMarketPrice - sMeta.previousClose) / sMeta.previousClose) * 100;
-            spotChange = (sChange > 0 ? '+' : '') + sChange.toFixed(2) + '%';
-            isSpotUp = sChange >= 0;
-          } catch (e) { }
-        }
-
-        return {
-          name: item.name,
-          value: price ? (item.code === 'BTC-USD' ? price.toLocaleString('en-US', { maximumFractionDigits: 0 }) : price.toLocaleString('en-US', { maximumFractionDigits: 2 })) : '-',
-          change: change ? (change > 0 ? '+' : '') + change.toFixed(2) + '%' : '0.00%',
-          changeAmt: price && prev ? (price - prev).toFixed(2) : '0',
-          isUp: change >= 0,
-          spotChange: spotChange,
-          isSpotUp: isSpotUp,
-          suffix: item.suffix || ''
-        };
+        changePercent = prev ? ((price - prev) / prev) * 100 : 0;
+        changeAmt = price - prev;
       }
+
+      // 🔥 철통 방어장치: 어떠한 경우에도 계산 오류(NaN)가 화면으로 넘어가지 않도록 0으로 치환
+      if (isNaN(changePercent) || changePercent === null) changePercent = 0;
+      if (isNaN(changeAmt) || changeAmt === null) changeAmt = 0;
+      if (isNaN(price) || price === null) price = 0;
+
+      // 3. 현물(Spot) 데이터 처리
+      let spotChangeStr = null;
+      let isSpotUp = null;
+
+      // ETF가 아닐 때만 현물 지표 추가 (TQQQ/SOXL은 두번째 현물 뱃지가 나오지 않도록 null 유지)
+      if (item.type !== 'etf' && item.spotCode && item.code !== item.spotCode) {
+        try {
+          const sMeta = await fetchChartMeta(item.spotCode, false);
+          const sPrice = sMeta.regularMarketPrice ?? sMeta.chartPreviousClose ?? 0;
+          const sPrev = sMeta.previousClose ?? sMeta.chartPreviousClose ?? sPrice;
+          
+          if (sPrev > 0) {
+            const sChange = ((sPrice - sPrev) / sPrev) * 100;
+            if (!isNaN(sChange)) {
+              spotChangeStr = (sChange > 0 ? '+' : '') + sChange.toFixed(2) + '%';
+              isSpotUp = sChange >= 0;
+            }
+          }
+        } catch (e) {}
+      }
+
+      // 4. 최종 데이터 포맷팅
+      const displayValue = price > 0 ? (item.code === 'BTC-USD' ? price.toLocaleString('en-US', { maximumFractionDigits: 0 }) : price.toLocaleString('en-US', { maximumFractionDigits: 2 })) : '-';
+      
+      return {
+        name: item.name,
+        value: displayValue,
+        change: (changePercent > 0 ? '+' : '') + changePercent.toFixed(2) + '%',
+        changeAmt: (changeAmt > 0 ? '+' : '') + changeAmt.toFixed(2),
+        isUp: changePercent >= 0,
+        spotChange: spotChangeStr,
+        isSpotUp: isSpotUp,
+        suffix: item.suffix || ''
+      };
     } catch (e) {
       console.error(`Fetch error for ${item.code}:`, e);
       return { name: item.name, value: '-', change: '0.00%', changeAmt: '0', isUp: null, suffix: item.suffix || '' };
