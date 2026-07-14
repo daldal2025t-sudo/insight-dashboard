@@ -69,25 +69,35 @@ function StockTicker() {
   const line1Stocks = liveData && liveData.length >= 8 ? liveData.slice(0, 8) : defaultStocks;
   const line2Macros = liveData && liveData.length >= 14 ? liveData.slice(8, 14) : defaultMacros;
 
+  // 🔥 사용자님의 100% 오리지널 코드! (화살표, 하단 컬러 바, 우측 정렬 모두 원상 복구)
   const renderItem = (item, index) => (
-    <div key={index} className="p-3 border-b border-r border-gray-100 bg-white hover:bg-gray-50 transition">
-      <span className="text-xs font-bold text-gray-500">{item.name}</span>
-      <div className="text-lg font-black text-gray-900">
-        {item.value}<span className="text-[10px] font-normal ml-0.5 text-gray-500">{item.suffix || ''}</span>
+    <div key={index} className="p-3 md:p-4 border-b md:border-b-0 md:border-r border-white flex flex-col justify-between bg-gray-100 hover:bg-gray-200 transition cursor-default">
+      <span className="text-xs md:text-sm font-bold text-gray-800 mb-2 truncate">{item.name}</span>
+      <div className="flex justify-between items-end gap-1">
+        <span className="text-sm md:text-base font-extrabold tracking-tighter text-gray-900 leading-none truncate pr-1">
+          {item.value}<span className="text-[10px] md:text-xs font-normal ml-0.5 text-gray-500">{item.suffix || ''}</span>
+        </span>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 md:gap-1 leading-none">
+            {item.isUp === true && <svg className="w-3 h-3 md:w-3.5 md:h-3.5 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
+            {item.isUp === false && <svg className="w-3 h-3 md:w-3.5 md:h-3.5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
+            <span className={`text-[10px] md:text-xs font-semibold ${item.isUp === true ? 'text-pink-600' : item.isUp === false ? 'text-blue-500' : 'text-gray-500'}`}>
+              {item.changeAmt && `${item.changeAmt} `}({item.change})
+            </span>
+          </div>
+          {item.spotChange && (
+            <div className="flex items-center gap-0.5 md:gap-1 leading-none mt-1">
+              <span className="text-[9px] bg-gray-300 text-gray-600 px-1 rounded font-bold tracking-tighter">현</span>
+              {item.isSpotUp === true && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
+              {item.isSpotUp === false && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
+              <span className={`text-[10px] md:text-[11px] font-semibold ${item.isSpotUp === true ? 'text-pink-600' : item.isSpotUp === false ? 'text-blue-500' : 'text-gray-500'}`}>
+                {item.spotChange}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
-      <div className="flex gap-2 text-[11px] font-bold mt-1">
-        {/* 🔥 ETF일 경우 글자 없이 실시간 등락률만 깔끔하게 표시 */}
-        {item.isETF ? (
-          <span className={item.isUp ? 'text-pink-600' : 'text-blue-600'}>{item.change}</span>
-        ) : (
-          <>
-            <span className={item.isUp ? 'text-pink-600' : 'text-blue-600'}>선물 {item.change}</span>
-            {item.spotChange && (
-              <span className={item.isSpotUp ? 'text-pink-600' : 'text-blue-600'}>현물 {item.spotChange}</span>
-            )}
-          </>
-        )}
-      </div>
+      <div className={`h-1 w-full mt-2 md:mt-3 ${item.isUp === true ? 'bg-pink-600' : item.isUp === false ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
     </div>
   );
 
@@ -98,7 +108,7 @@ function StockTicker() {
           <h2 className="text-sm md:text-base font-bold tracking-tight">글로벌 핵심 증시 (선물/현물 듀얼)</h2>
           <button onClick={fetchStocks} className="text-xs bg-gray-600 hover:bg-gray-700 px-3 py-1.5 rounded-md transition flex items-center gap-1">↻ 다시 로딩</button>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 border-t border-l border-gray-100 rounded-b-xl overflow-hidden">
+        <div className="grid grid-cols-2 md:grid-cols-4 border-x border-b border-gray-200 rounded-b-xl overflow-hidden">
           {line1Stocks.map((stock, index) => renderItem(stock, index))}
         </div>
       </div>
@@ -106,7 +116,7 @@ function StockTicker() {
         <div className="bg-slate-700 text-white px-4 py-2 flex justify-between items-center rounded-t-xl">
           <h2 className="text-sm md:text-base font-bold tracking-tight">외환 및 주요 거시경제 지표</h2>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 border-t border-l border-gray-100 rounded-b-xl overflow-hidden">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 border-x border-b border-gray-200 rounded-b-xl overflow-hidden">
           {line2Macros.map((macro, index) => renderItem(macro, index))}
         </div>
       </div>
