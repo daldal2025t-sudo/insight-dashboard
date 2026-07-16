@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  // 🔥 배열 순서: 다우, 러셀 다음에 TQQQ, SOXL 유지
   const symbols = [
     { code: 'ES=F', spotCode: '^GSPC', name: 'S&P 500', type: 'index' },
     { code: 'NQ=F', spotCode: '^IXIC', name: 'NASDAQ', type: 'index' },
@@ -44,28 +43,36 @@ export async function GET() {
     try {
       const meta = await fetchChartMeta(item.code, item.type === 'etf');
 
-      // 🔥 NaN 버그 해결의 핵심: 야후 API가 previousClose를 주지 않을 때 chartPreviousClose로 강제 대체
+      // 안전한 기본값 확보
       let price = meta.regularMarketPrice ?? meta.chartPreviousClose ?? 0;
       let prev = meta.previousClose ?? meta.chartPreviousClose ?? price;
       
       let changePercent = 0;
       let changeAmt = 0;
 
-      // 1. ETF (프리장/애프터장 반영)
+      // 1. ETF (TQQQ, SOXL) 실시간 본장 및 프리/애프터장 완벽 대응
       if (item.type === 'etf') {
         const state = meta.marketState;
+        
+        // 정상적인 전일 종가 기준점(기본값은 무조건 어제 정규장 종가여야 함)
+        const basePrev = meta.chartPreviousClose ?? meta.previousClose ?? prev;
+
         if (state === 'PRE' && meta.preMarketPrice != null) {
           price = meta.preMarketPrice;
-          changePercent = meta.preMarketChangePercent ?? (prev ? ((price - prev) / prev) * 100 : 0);
-          changeAmt = meta.preMarketChange ?? (price - prev);
+          changePercent = meta.preMarketChangePercent ?? (basePrev ? ((price - basePrev) / basePrev) * 100 : 0);
+          changeAmt = meta.preMarketChange ?? (price - basePrev);
         } else if (state === 'POST' && meta.postMarketPrice != null) {
-          const base = meta.regularMarketPrice ?? prev;
           price = meta.postMarketPrice;
-          changePercent = meta.postMarketChangePercent ?? (base ? ((price - base) / base) * 100 : 0);
-          changeAmt = meta.postMarketChange ?? (price - base);
+          // 애프터마켓은 당일 정규장 종가(regularMarketPrice) 대비 등락률을 보여주는 것이 야후 공식 스펙입니다.
+          const regularClose = meta.regularMarketPrice ?? basePrev;
+          changePercent = meta.postMarketChangePercent ?? (regularClose ? ((price - regularClose) / regularClose) * 100 : 0);
+          changeAmt = meta.postMarketChange ?? (price - regularClose);
         } else {
-          changePercent = prev ? ((price - prev) / prev) * 100 : 0;
-          changeAmt = price - prev;
+          // 💡 REGULAR(정규장 진행중) 및 주말/종가 고정 상태
+          // 기존 오류 수정: 장중 실시간 현재가(price)와 고정된 전일종가(basePrev)를 비교하도록 강제 세팅
+          price = meta.regularMarketPrice ?? meta.postMarketPrice ?? basePrev;
+          changePercent = basePrev ? ((price - basePrev) / basePrev) * 100 : 0;
+          changeAmt = price - basePrev;
         }
       } 
       // 2. 일반 지수
@@ -74,16 +81,15 @@ export async function GET() {
         changeAmt = price - prev;
       }
 
-      // 🔥 철통 방어장치: 어떠한 경우에도 계산 오류(NaN)가 화면으로 넘어가지 않도록 0으로 치환
+      // NaN 및 데이터 유실 원천 차단
       if (isNaN(changePercent) || changePercent === null) changePercent = 0;
       if (isNaN(changeAmt) || changeAmt === null) changeAmt = 0;
       if (isNaN(price) || price === null) price = 0;
 
-      // 3. 현물(Spot) 데이터 처리
+      // 3. 현물(Spot) 데이터 처리 (TQQQ/SOXL은 단일 등락률을 위해 제외 상태 유지)
       let spotChangeStr = null;
       let isSpotUp = null;
 
-      // ETF가 아닐 때만 현물 지표 추가 (TQQQ/SOXL은 두번째 현물 뱃지가 나오지 않도록 null 유지)
       if (item.type !== 'etf' && item.spotCode && item.code !== item.spotCode) {
         try {
           const sMeta = await fetchChartMeta(item.spotCode, false);
@@ -100,7 +106,6 @@ export async function GET() {
         } catch (e) {}
       }
 
-      // 4. 최종 데이터 포맷팅
       const displayValue = price > 0 ? (item.code === 'BTC-USD' ? price.toLocaleString('en-US', { maximumFractionDigits: 0 }) : price.toLocaleString('en-US', { maximumFractionDigits: 2 })) : '-';
       
       return {
