@@ -12,7 +12,6 @@ export default function ArchivePage() {
 
   const [budget, setBudget] = useState('');
   
-  // 🔥 [수정됨] 자동 연동을 위해 초기값은 1400으로 두되, useEffect에서 실시간 환율을 덮어씌웁니다.
   const [exchangeRate, setExchangeRate] = useState(1400);
 
   const [checks, setChecks] = useState({ q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false, q8: false, q9: false });
@@ -30,7 +29,6 @@ export default function ArchivePage() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
-    // 1. 로컬 스토리지 데이터 로드
     const savedTabLists = localStorage.getItem('kijay_tab_configurations');
     if (savedTabLists) { 
       try { 
@@ -44,24 +42,19 @@ export default function ArchivePage() {
     const savedQuantities = localStorage.getItem('kijay_etf_counts_v2');
     if (savedQuantities) { try { setQuantities(JSON.parse(savedQuantities)); } catch (e) {} }
 
-    // 2. ETF 마스터 풀 데이터 로드
     fetch('/api/etfs')
       .then(res => res.json())
       .then(data => { if (!data.error) setMasterPool(data.pool || []); setIsLoading(false); })
       .catch(err => console.error(err));
 
-    // 🔥 3. [신규 추가] 메인 대시보드 API(/api/stocks)를 호출하여 실시간 원/달러 환율 긁어오기
     fetch('/api/stocks')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
-          // 이름에 '환율'이 포함되거나 코드가 'KRW=X'인 항목 찾기
           const krwItem = data.find(item => (item.name && item.name.includes('환율')) || item.code === 'KRW=X');
           if (krwItem && krwItem.value) {
             const parsedRate = parseFloat(String(krwItem.value).replace(/,/g, ''));
-            if (!isNaN(parsedRate)) {
-              setExchangeRate(parsedRate);
-            }
+            if (!isNaN(parsedRate)) setExchangeRate(parsedRate);
           }
         }
       })
@@ -83,7 +76,7 @@ export default function ArchivePage() {
   };
 
   const handleAddStockToTab = (code) => {
-    if (['checker', 'rebalance', 'dividend', 'backtest', 'checklist'].includes(activeTab)) return;
+    if (['checker', 'rebalance', 'returns', 'checklist'].includes(activeTab)) return;
     const targetTab = activeTab === 'models' ? editModelTarget : activeTab;
     const isExist = tabLists[targetTab]?.some(item => item.code === code);
     if (isExist) return;
@@ -145,7 +138,7 @@ export default function ArchivePage() {
   let sizeTotals = { large: 0, mid: 0, small: 0 };
   let styleTotals = { value: 0, blend: 0, growth: 0 };
 
-  const isCalculationRequired = ['checker', 'rebalance', 'dividend', 'backtest'].includes(activeTab);
+  const isCalculationRequired = ['checker', 'rebalance', 'returns', 'backtest'].includes(activeTab);
 
   const getMappedItems = (tabKey) => {
     return (tabLists[tabKey] || []).map(config => {
@@ -170,7 +163,6 @@ export default function ArchivePage() {
     const price = foundData ? getRawPrice(foundData.value) : 0;
     const isUS = foundData ? !foundData.symbol.endsWith('.KS') : false;
     
-    // 🔥 평가액 계산 시 미국 주식이면 실시간 연동된 환율을 곱해 원화로 통일
     const evalValue = isUS ? price * qty * exchangeRate : price * qty;
 
     if (isCalculationRequired) {
@@ -310,7 +302,6 @@ export default function ArchivePage() {
             const targetWeightValue = parseFloat(String(etf.targetWeight).replace('%', '')) || 0;
             const allocatedAmount = budget ? (Number(budget) * targetWeightValue) / 100 : 0;
             
-            // 매수 수량 계산 시 미국 주식은 달러가 기준이므로, 연동된 환율 적용
             const priceInKRW = etf.isUS ? rawPrice * exchangeRate : rawPrice;
             const sharesToBuy = priceInKRW > 0 ? Math.floor(allocatedAmount / priceInKRW) : 0;
 
@@ -413,8 +404,10 @@ export default function ArchivePage() {
           <button onClick={() => setActiveTab('myassets')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'myassets' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💰 내 자산</button>
           <button onClick={() => setActiveTab('models')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'models' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📚 모델 포트폴리오</button>
           <button onClick={() => setActiveTab('checker')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'checker' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📊 보유 비중</button>
-          <button onClick={() => setActiveTab('dividend')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'dividend' ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💸 배당/수익</button>
-          <button onClick={() => setActiveTab('backtest')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'backtest' ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📈 과거 수익률</button>
+          
+          {/* 🔥 탭 통합: '과거수익률'과 '배당률'을 하나로 합친 탭 버튼 */}
+          <button onClick={() => setActiveTab('returns')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'returns' ? 'bg-gradient-to-r from-indigo-500 to-rose-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📈 수익률 및 배당</button>
+          
           <button onClick={() => setActiveTab('rebalance')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'rebalance' ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔄 리밸런싱</button>
           <button onClick={() => setActiveTab('checklist')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'checklist' ? 'bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>✅ 종목 진단</button>
         </div>
@@ -470,7 +463,6 @@ export default function ArchivePage() {
               </div>
               <div className="flex flex-col items-end gap-3">
                 <span className="bg-white/10 border border-white/20 px-3 py-1 rounded-full font-bold text-xs text-gray-300 shrink-0">실시간 연동</span>
-                {/* 🔥 [신규 추가] 보유 비중 탭 실시간 환율 뷰어 */}
                 <div className="flex items-center gap-2 bg-gray-800 px-2 py-1.5 rounded-lg border border-gray-700">
                    <label className="text-[10px] font-bold text-gray-400">🇺🇸 실시간 환율</label>
                    <span className="text-xs font-bold text-gray-200">{exchangeRate.toLocaleString('ko-KR', {maximumFractionDigits: 2})}</span>
@@ -480,21 +472,10 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {activeTab === 'dividend' && (
-            <div className="flex flex-col gap-6">
-              <div className="bg-gradient-to-r from-rose-50 to-pink-50 border border-pink-100 rounded-2xl p-6 shadow-sm">
-                <h2 className="text-xl font-black text-pink-900 mb-6 flex items-center gap-2">💸 나의 배당 파이프라인 현황</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-white p-5 rounded-xl shadow-sm border border-pink-50 flex flex-col justify-center items-center text-center"><p className="text-xs font-bold text-gray-400 mb-1">포트폴리오 가중 평균 배당률</p><p className="text-3xl font-black text-pink-600">{avgDivYield.toFixed(2)}<span className="text-lg font-bold ml-1">%</span></p></div>
-                  <div className="bg-white p-5 rounded-xl shadow-sm border border-pink-50 flex flex-col justify-center items-center text-center"><p className="text-xs font-bold text-gray-400 mb-1">예상 연간 배당금 (세전)</p><p className="text-2xl font-black text-gray-800">{Math.round(totalAnnualDividend).toLocaleString('ko-KR')}<span className="text-base font-bold ml-1 text-gray-500">원</span></p></div>
-                  <div className="bg-gradient-to-br from-pink-600 to-rose-600 p-5 rounded-xl shadow-md flex flex-col justify-center items-center text-center"><p className="text-xs font-bold text-pink-100 mb-1">예상 월평균 배당금 (세후 15.4% 적용)</p><p className="text-3xl font-black text-white">{Math.round(monthlyDiv).toLocaleString('ko-KR')}<span className="text-lg font-bold ml-1 text-pink-200">원/월</span></p></div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'backtest' && (
-            <div className="flex flex-col gap-6">
+          {/* 🔥 탭 통합: 과거수익률과 배당률을 하나로 표시하는 컨테이너 */}
+          {activeTab === 'returns' && (
+            <div className="flex flex-col gap-6 animate-fade-in">
+              {/* 1. 수익률 파트 (기존 backtest 내용) */}
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-indigo-100 rounded-2xl p-6 shadow-sm">
                 <h2 className="text-xl font-black text-indigo-900 mb-2 flex items-center gap-2">📈 과거 수익률 기반 (10년 시뮬레이션)</h2>
                 <p className="text-xs text-gray-500 font-semibold mb-6">※ 현재 포트폴리오 비중을 유지했을 때의 과거 데이터를 기반으로 한 향후 10년 추정 자산 성장 곡선입니다.</p>
@@ -519,6 +500,16 @@ export default function ArchivePage() {
                 ) : (
                   <div className="bg-white p-8 rounded-xl text-center text-gray-400 font-bold text-sm">자산을 먼저 입력하시면 시뮬레이션 차트가 생성됩니다.</div>
                 )}
+              </div>
+
+              {/* 2. 배당률 파트 (기존 dividend 내용) */}
+              <div className="bg-gradient-to-r from-rose-50 to-pink-50 border border-pink-100 rounded-2xl p-6 shadow-sm">
+                <h2 className="text-xl font-black text-pink-900 mb-6 flex items-center gap-2">💸 나의 배당 파이프라인 현황</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-white p-5 rounded-xl shadow-sm border border-pink-50 flex flex-col justify-center items-center text-center"><p className="text-xs font-bold text-gray-400 mb-1">포트폴리오 가중 평균 배당률</p><p className="text-3xl font-black text-pink-600">{avgDivYield.toFixed(2)}<span className="text-lg font-bold ml-1">%</span></p></div>
+                  <div className="bg-white p-5 rounded-xl shadow-sm border border-pink-50 flex flex-col justify-center items-center text-center"><p className="text-xs font-bold text-gray-400 mb-1">예상 연간 배당금 (세전)</p><p className="text-2xl font-black text-gray-800">{Math.round(totalAnnualDividend).toLocaleString('ko-KR')}<span className="text-base font-bold ml-1 text-gray-500">원</span></p></div>
+                  <div className="bg-gradient-to-br from-pink-600 to-rose-600 p-5 rounded-xl shadow-md flex flex-col justify-center items-center text-center"><p className="text-xs font-bold text-pink-100 mb-1">예상 월평균 배당금 (세후 15.4% 적용)</p><p className="text-3xl font-black text-white">{Math.round(monthlyDiv).toLocaleString('ko-KR')}<span className="text-lg font-bold ml-1 text-pink-200">원/월</span></p></div>
+                </div>
               </div>
             </div>
           )}
@@ -663,7 +654,7 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {!['dividend', 'backtest', 'rebalance', 'checklist'].includes(activeTab) && (
+          {!['returns', 'rebalance', 'checklist'].includes(activeTab) && (
             <>
               {isLoading ? (
                 <div className="text-center py-12 text-gray-400 font-bold text-sm">마스터 데이터 파싱 엔진 동기화 중... ⏳</div>
@@ -673,7 +664,6 @@ export default function ArchivePage() {
                   {activeTab === 'checker' && renderTable(finalMappedItems, 'checker')}
                   {activeTab === 'models' && (
                     <div className="flex flex-col gap-8">
-                      {/* 🔥 [신규 수정] 모델 탭 메인 API 자동 연동 환율 뷰어 및 예산 입력 UI 결합 */}
                       <div className="bg-blue-50 p-4 md:p-5 rounded-2xl border border-blue-100 flex flex-col gap-3 shadow-sm mb-2">
                         <div className="flex flex-col md:flex-row md:items-center gap-4">
                           <label className="text-sm md:text-base font-extrabold text-blue-900 whitespace-nowrap">
