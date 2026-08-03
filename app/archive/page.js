@@ -468,7 +468,7 @@ export default function ArchivePage() {
                     <input type="checkbox" readOnly checked={checks.q10} className="mt-1 w-5 h-5 accent-emerald-600 shrink-0 opacity-80 cursor-default" />
                     <div className="flex flex-col w-full">
                       <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-1 gap-2">
-                        <span className={`text-sm md:text-base font-black ${checks.q10 ? 'text-emerald-900' : 'text-gray-800'}`}>10. 벤저민 그레이엄 내재 가치 점검 (자동 판별)</span>
+                        <span className={`text-sm md:text-base font-black ${checks.q10 ? 'text-emerald-900' : 'text-gray-800'}`}>10. 벤저민 그레이엄 적정 주가</span>
                         
                         {/* 💡 공식을 명확히 두 줄로 분리 */}
                         <div className="flex flex-col text-[10px] md:text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 w-full md:w-max leading-relaxed shadow-sm">
@@ -479,12 +479,12 @@ export default function ArchivePage() {
                       
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mt-2 gap-3">
                         <span className="text-[11px] md:text-xs text-gray-500 leading-relaxed break-keep flex-1">
-                          아래 지표를 입력해 주세요. 계산된 '적정 주가'가 '현재 주가'보다 높을 경우(저평가 상태) 자동으로 체크되어 점수에 반영됩니다.
+                          아래 지표를 입력해 주세요. (키움증권 - 적정주가 크로스체크)
                         </span>
                         
                         {/* 💡 Finviz 새창 열기 버튼 (iframe 대체) */}
                         <a href="https://finviz.com" target="_blank" rel="noreferrer" className="shrink-0 w-full md:w-auto text-center flex justify-center items-center gap-1.5 text-xs font-bold text-white bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-sm">
-                          📊 Finviz에서 지표 찾기 ↗
+                          📊 Finviz.com ↗
                         </a>
                       </div>
 
