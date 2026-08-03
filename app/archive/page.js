@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
@@ -13,10 +13,10 @@ export default function ArchivePage() {
   const [budget, setBudget] = useState('');
   const [exchangeRate, setExchangeRate] = useState(1400);
 
-  // 🔥 10번 항목(그레이엄 계산기 결과)까지 포함되도록 checks 상태 확장 (총 10개)
+  // 🔥 10번 항목(그레이엄 계산기 결과)까지 포함되도록 checks 상태 확장
   const [checks, setChecks] = useState({ q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false, q8: false, q9: false, q10: false });
 
-  // 🏛️ 벤저민 그레이엄 밸류에이션 전용 상태 (이미지 공식 기준)
+  // 🏛️ 벤저민 그레이엄 밸류에이션 전용 상태
   const [grahamGrowth, setGrahamGrowth] = useState('');     // 기대성장률 (%)
   const [grahamCurrentPer, setGrahamCurrentPer] = useState(''); // 현재 PER
   const [grahamCurrentPrice, setGrahamCurrentPrice] = useState(''); // 현재 주가 ($)
@@ -71,22 +71,23 @@ export default function ArchivePage() {
   const currentPerVal = parseFloat(grahamCurrentPer) || 0;
   const currentPriceVal = parseFloat(grahamCurrentPrice) || 0;
 
-  // 공식: 가치 = (기대성장률 * 100) / 현재 PER
-  const fairValueMultiplier = currentPerVal > 0 ? (growthVal * 100) / currentPerVal : 0;
-  // 주가와의 괴리율 산출을 위해 multiplier를 기반으로 단순 상대 비교(업사이드) 진행
-  // ※ 첨부 이미지의 공식이 단순 배수(승수)이므로, 1보다 크면 저평가, 작으면 고평가로 해석하여 괴리율 산출
-  const upsidePercent = fairValueMultiplier > 0 ? (fairValueMultiplier - 1) * 100 : 0; 
-  const isUndervalued = currentPerVal > 0 && growthVal > 0 && fairValueMultiplier >= 1; // 가치 승수가 1(100%) 이상이면 저평가로 간주
+  // 🔥 요청하신 신규 공식 적용
+  const fairPE = 8.5 + (2 * growthVal);
+  const fairPrice = currentPerVal > 0 ? (fairPE / currentPerVal) * currentPriceVal : 0;
+  
+  // 괴리율(상승 여력) 산출
+  const upsidePercent = currentPriceVal > 0 && fairPrice > 0 ? ((fairPrice - currentPriceVal) / currentPriceVal) * 100 : 0; 
+  
+  // 저평가 판단: 적정 주가가 현재 주가보다 크거나 같으면 통과 (체크)
+  const isUndervalued = currentPerVal > 0 && growthVal > 0 && currentPriceVal > 0 && fairPrice >= currentPriceVal;
 
   useEffect(() => {
-    // 계산된 결과에 따라 10번째 체크리스트 자동 on/off
-    // 사용자가 값을 입력한 상태(currentPerVal > 0)에서만 동작
     if (currentPerVal > 0 && growthVal > 0 && currentPriceVal > 0) {
       setChecks(prev => ({ ...prev, q10: isUndervalued }));
     } else {
       setChecks(prev => ({ ...prev, q10: false }));
     }
-  }, [fairValueMultiplier, isUndervalued, currentPerVal, growthVal, currentPriceVal]);
+  }, [fairPrice, isUndervalued, currentPerVal, growthVal, currentPriceVal]);
 
 
   const handleWeightChange = (tab, code, textValue) => {
@@ -405,7 +406,7 @@ export default function ArchivePage() {
     );
   };
 
-  // 🔥 1~9번: 일반 체크리스트 (수동 조작 가능)
+  // 🔥 1~9번 일반 체크리스트
   const checklistData = [
     { id: 'q1', title: "1. 매출 안정성 및 성장률 점검 (Revenue growth)", desc: "Financials - Revenue growth 확인 (💡대형우량주: 우상향 안정성 / 💡고성장주: 연 20~25% 이상 / 💡경기순환주: 사이클상 저점 확인)" },
     { id: 'q2', title: "2. PER 수준 (Price to Earnings Ratio)", desc: "Financials - Ratios 현재 PER이 과거 PER 대비 저렴한가요?" },
@@ -418,7 +419,7 @@ export default function ArchivePage() {
     { id: 'q9', title: "9. 예상 주당순이익 성장률 (Forecast EPS)", desc: "EPS Growth Low 의견 확인하셨나요?" }
   ];
 
-  // 🔥 10개 기준으로 점수 계산 (1문항당 10점, 10개 모두 만족 시 100점)
+  // 🔥 10개 기준으로 점수 계산 (10개 모두 만족 시 100점)
   const checkedCount = Object.values(checks).filter(Boolean).length;
   const score = Math.round((checkedCount / 10) * 100);
 
@@ -460,7 +461,7 @@ export default function ArchivePage() {
                   </label>
                 ))}
 
-                {/* 🔥 10번 자동 계산 체크리스트 (그레이엄 계산기 내장) */}
+                {/* 🔥 10번 자동 계산 체크리스트 (그레이엄 공식 계산기) */}
                 <div className={`flex flex-col gap-4 p-4 md:p-5 rounded-xl border transition-all duration-300 ${checks.q10 ? 'bg-emerald-50 border-emerald-300 shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
                   <div className="flex items-start gap-3 md:gap-4">
                     {/* 자동 체크박스 (클릭 막음 - 계산 결과에 따라 연동) */}
@@ -468,10 +469,12 @@ export default function ArchivePage() {
                     <div className="flex flex-col w-full">
                       <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-1">
                         <span className={`text-sm md:text-base font-black ${checks.q10 ? 'text-emerald-900' : 'text-gray-800'}`}>10. 벤저민 그레이엄 내재 가치 점검 (자동 판별)</span>
-                        <span className="text-[10px] md:text-xs font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 mt-2 md:mt-0 w-max">가치 = (성장률 × 100) ÷ 현재 PER</span>
+                        <span className="text-[10px] md:text-xs font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 mt-2 md:mt-0 w-max">
+                          공식: 적정 PER = 8.5 + 2 × 기대성장률 | 적정 주가 = (적정 PER ÷ 현재 PER) × 현재 주가
+                        </span>
                       </div>
                       <span className="text-[11px] md:text-xs text-gray-500 leading-relaxed break-keep">
-                        아래 지표를 입력해 주세요. 계산된 상대적 가치(승수)가 1 이상(즉, 현재 주가가 저평가)일 경우 자동으로 체크되어 점수에 반영됩니다.
+                        아래 지표를 입력해 주세요. 계산된 '적정 주가'가 '현재 주가'보다 높을 경우(저평가 상태) 자동으로 체크되어 점수에 반영됩니다.
                       </span>
 
                       {/* ⬇️ 내부 계산기 UI */}
@@ -495,13 +498,18 @@ export default function ArchivePage() {
                         <div className="mt-4 flex flex-col md:flex-row justify-between items-center bg-white border border-gray-200 p-3 rounded-lg shadow-sm gap-2">
                           <div className="flex gap-4 w-full md:w-auto text-center md:text-left justify-center">
                             <div>
-                              <p className="text-[10px] font-bold text-gray-400">계산된 가치 승수</p>
-                              <p className="text-sm font-black text-gray-800">{fairValueMultiplier.toFixed(2)}배</p>
+                              <p className="text-[10px] font-bold text-gray-400">계산된 적정 PER</p>
+                              <p className="text-sm font-black text-gray-800">{fairPE.toFixed(2)}배</p>
+                            </div>
+                            <div className="w-px bg-gray-200 h-8 hidden md:block"></div>
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400">산출된 적정 주가</p>
+                              <p className="text-sm font-black text-emerald-600">${fairPrice.toFixed(2)}</p>
                             </div>
                             <div className="w-px bg-gray-200 h-8 hidden md:block"></div>
                             <div>
                               <p className="text-[10px] font-bold text-gray-400">주가 상승 여력(괴리율)</p>
-                              <p className={`text-sm font-black ${upsidePercent >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                              <p className={`text-sm font-black ${upsidePercent >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
                                 {upsidePercent >= 0 ? '+' : ''}{upsidePercent.toFixed(1)}%
                               </p>
                             </div>
