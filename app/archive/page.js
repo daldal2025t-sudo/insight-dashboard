@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
@@ -13,12 +13,13 @@ export default function ArchivePage() {
   const [budget, setBudget] = useState('');
   const [exchangeRate, setExchangeRate] = useState(1400);
 
-  const [checks, setChecks] = useState({ q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false, q8: false, q9: false });
+  // 🔥 10번 항목(그레이엄 계산기 결과)까지 포함되도록 checks 상태 확장 (총 10개)
+  const [checks, setChecks] = useState({ q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false, q8: false, q9: false, q10: false });
 
-  // 🏛️ 벤저민 그레이엄 밸류에이션 상태
-  const [grahamEps, setGrahamEps] = useState('');
-  const [grahamGrowth, setGrahamGrowth] = useState('');
-  const [grahamCurrentPrice, setGrahamCurrentPrice] = useState('');
+  // 🏛️ 벤저민 그레이엄 밸류에이션 전용 상태 (이미지 공식 기준)
+  const [grahamGrowth, setGrahamGrowth] = useState('');     // 기대성장률 (%)
+  const [grahamCurrentPer, setGrahamCurrentPer] = useState(''); // 현재 PER
+  const [grahamCurrentPrice, setGrahamCurrentPrice] = useState(''); // 현재 주가 ($)
 
   const [tabLists, setTabLists] = useState({
     myassets: [],
@@ -64,6 +65,29 @@ export default function ArchivePage() {
       })
       .catch(err => console.error('환율 연동 실패:', err));
   }, []);
+
+  // 🏛️ 그레이엄 밸류에이션 실시간 계산 및 10번 자동 체크 로직
+  const growthVal = parseFloat(grahamGrowth) || 0;
+  const currentPerVal = parseFloat(grahamCurrentPer) || 0;
+  const currentPriceVal = parseFloat(grahamCurrentPrice) || 0;
+
+  // 공식: 가치 = (기대성장률 * 100) / 현재 PER
+  const fairValueMultiplier = currentPerVal > 0 ? (growthVal * 100) / currentPerVal : 0;
+  // 주가와의 괴리율 산출을 위해 multiplier를 기반으로 단순 상대 비교(업사이드) 진행
+  // ※ 첨부 이미지의 공식이 단순 배수(승수)이므로, 1보다 크면 저평가, 작으면 고평가로 해석하여 괴리율 산출
+  const upsidePercent = fairValueMultiplier > 0 ? (fairValueMultiplier - 1) * 100 : 0; 
+  const isUndervalued = currentPerVal > 0 && growthVal > 0 && fairValueMultiplier >= 1; // 가치 승수가 1(100%) 이상이면 저평가로 간주
+
+  useEffect(() => {
+    // 계산된 결과에 따라 10번째 체크리스트 자동 on/off
+    // 사용자가 값을 입력한 상태(currentPerVal > 0)에서만 동작
+    if (currentPerVal > 0 && growthVal > 0 && currentPriceVal > 0) {
+      setChecks(prev => ({ ...prev, q10: isUndervalued }));
+    } else {
+      setChecks(prev => ({ ...prev, q10: false }));
+    }
+  }, [fairValueMultiplier, isUndervalued, currentPerVal, growthVal, currentPriceVal]);
+
 
   const handleWeightChange = (tab, code, textValue) => {
     const updatedTabList = tabLists[tab].map(item => item.code === code ? { ...item, weight: textValue } : item);
@@ -381,7 +405,7 @@ export default function ArchivePage() {
     );
   };
 
-  // 🔥 [수정됨] 사용자 요청 반영 9대 매수 체크리스트 데이터
+  // 🔥 1~9번: 일반 체크리스트 (수동 조작 가능)
   const checklistData = [
     { id: 'q1', title: "1. 매출 안정성 및 성장률 점검 (Revenue growth)", desc: "Financials - Revenue growth 확인 (💡대형우량주: 우상향 안정성 / 💡고성장주: 연 20~25% 이상 / 💡경기순환주: 사이클상 저점 확인)" },
     { id: 'q2', title: "2. PER 수준 (Price to Earnings Ratio)", desc: "Financials - Ratios 현재 PER이 과거 PER 대비 저렴한가요?" },
@@ -394,17 +418,9 @@ export default function ArchivePage() {
     { id: 'q9', title: "9. 예상 주당순이익 성장률 (Forecast EPS)", desc: "EPS Growth Low 의견 확인하셨나요?" }
   ];
 
+  // 🔥 10개 기준으로 점수 계산 (1문항당 10점, 10개 모두 만족 시 100점)
   const checkedCount = Object.values(checks).filter(Boolean).length;
-  const score = Math.round((checkedCount / 9) * 100);
-
-  // 🏛️ 벤저민 그레이엄 적정 주가 계산 로직 (수식: 적정PER = 8.5 + 2g, 적정주가 = EPS * 적정PER)
-  const epsVal = parseFloat(grahamEps) || 0;
-  const growthVal = parseFloat(grahamGrowth) || 0;
-  const currentPriceVal = parseFloat(grahamCurrentPrice) || 0;
-
-  const fairPE = 8.5 + (2 * growthVal);
-  const fairPrice = epsVal * fairPE;
-  const upsidePercent = currentPriceVal > 0 ? ((fairPrice - currentPriceVal) / currentPriceVal) * 100 : 0;
+  const score = Math.round((checkedCount / 10) * 100);
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans pb-24">
@@ -425,14 +441,15 @@ export default function ArchivePage() {
 
         <section className="flex flex-col gap-6">
           {activeTab === 'checklist' && (
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-6 animate-fade-in">
               <div className="bg-gradient-to-r from-indigo-900 to-blue-900 text-white p-5 md:p-6 rounded-2xl shadow-sm flex flex-col gap-2">
                 <span className="text-[10px] tracking-widest font-black text-blue-300 uppercase">Fundamental Master Analysis</span>
-                <h2 className="text-xl md:text-2xl font-black">🚩 100배주 발굴 9대 매수 체크리스트</h2>
-                <p className="text-xs md:text-sm text-blue-100 opacity-80 mt-1">개별 주식 매수 전, 9가지 필수 펀더멘털 지표를 단 한 장으로 점검하세요.</p>
+                <h2 className="text-xl md:text-2xl font-black">🚩 10대 매수 체크리스트 & 자동 밸류에이션</h2>
+                <p className="text-xs md:text-sm text-blue-100 opacity-80 mt-1">개별 주식 매수 전, 필수 펀더멘털 지표 점검과 내재 가치 평가를 동시에 진행하세요.</p>
               </div>
 
               <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
+                {/* 1~9번 일반 체크리스트 항목 */}
                 {checklistData.map((item) => (
                   <label key={item.id} className={`flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl border cursor-pointer transition ${checks[item.id] ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-transparent hover:bg-gray-100'}`}>
                     <input type="checkbox" checked={checks[item.id]} onChange={(e) => setChecks({...checks, [item.id]: e.target.checked})} className="mt-1 w-5 h-5 accent-indigo-600 shrink-0 cursor-pointer" />
@@ -442,99 +459,90 @@ export default function ArchivePage() {
                     </div>
                   </label>
                 ))}
+
+                {/* 🔥 10번 자동 계산 체크리스트 (그레이엄 계산기 내장) */}
+                <div className={`flex flex-col gap-4 p-4 md:p-5 rounded-xl border transition-all duration-300 ${checks.q10 ? 'bg-emerald-50 border-emerald-300 shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="flex items-start gap-3 md:gap-4">
+                    {/* 자동 체크박스 (클릭 막음 - 계산 결과에 따라 연동) */}
+                    <input type="checkbox" readOnly checked={checks.q10} className="mt-1 w-5 h-5 accent-emerald-600 shrink-0 opacity-80 cursor-default" />
+                    <div className="flex flex-col w-full">
+                      <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-1">
+                        <span className={`text-sm md:text-base font-black ${checks.q10 ? 'text-emerald-900' : 'text-gray-800'}`}>10. 벤저민 그레이엄 내재 가치 점검 (자동 판별)</span>
+                        <span className="text-[10px] md:text-xs font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 mt-2 md:mt-0 w-max">가치 = (성장률 × 100) ÷ 현재 PER</span>
+                      </div>
+                      <span className="text-[11px] md:text-xs text-gray-500 leading-relaxed break-keep">
+                        아래 지표를 입력해 주세요. 계산된 상대적 가치(승수)가 1 이상(즉, 현재 주가가 저평가)일 경우 자동으로 체크되어 점수에 반영됩니다.
+                      </span>
+
+                      {/* ⬇️ 내부 계산기 UI */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-5">
+                        <div className="bg-white p-3 border border-gray-200 rounded-lg">
+                          <label className="text-[10px] font-bold text-gray-500 mb-1.5 block">1️⃣ 기대성장률 (%)</label>
+                          <input type="number" step="0.1" placeholder="예: 15" value={grahamGrowth} onChange={(e) => setGrahamGrowth(e.target.value)} className="w-full font-bold text-sm text-gray-900 outline-none focus:text-indigo-600" />
+                        </div>
+                        <div className="bg-white p-3 border border-gray-200 rounded-lg">
+                          <label className="text-[10px] font-bold text-gray-500 mb-1.5 block">2️⃣ 현재 PER</label>
+                          <input type="number" step="0.1" placeholder="예: 25.4" value={grahamCurrentPer} onChange={(e) => setGrahamCurrentPer(e.target.value)} className="w-full font-bold text-sm text-gray-900 outline-none focus:text-indigo-600" />
+                        </div>
+                        <div className="bg-white p-3 border border-gray-200 rounded-lg">
+                          <label className="text-[10px] font-bold text-gray-500 mb-1.5 block">3️⃣ 현재 주가 ($)</label>
+                          <input type="number" step="0.01" placeholder="예: 150.00" value={grahamCurrentPrice} onChange={(e) => setGrahamCurrentPrice(e.target.value)} className="w-full font-bold text-sm text-gray-900 outline-none focus:text-indigo-600" />
+                        </div>
+                      </div>
+
+                      {/* 계산 결과 뷰어 */}
+                      {currentPerVal > 0 && growthVal > 0 && currentPriceVal > 0 && (
+                        <div className="mt-4 flex flex-col md:flex-row justify-between items-center bg-white border border-gray-200 p-3 rounded-lg shadow-sm gap-2">
+                          <div className="flex gap-4 w-full md:w-auto text-center md:text-left justify-center">
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400">계산된 가치 승수</p>
+                              <p className="text-sm font-black text-gray-800">{fairValueMultiplier.toFixed(2)}배</p>
+                            </div>
+                            <div className="w-px bg-gray-200 h-8 hidden md:block"></div>
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400">주가 상승 여력(괴리율)</p>
+                              <p className={`text-sm font-black ${upsidePercent >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                {upsidePercent >= 0 ? '+' : ''}{upsidePercent.toFixed(1)}%
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="w-full md:w-auto flex justify-center mt-2 md:mt-0">
+                            {isUndervalued ? (
+                              <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-black px-4 py-2 rounded-full w-full text-center md:w-max">
+                                ✅ 저평가 통과 (점수 +10)
+                              </span>
+                            ) : (
+                              <span className="bg-red-50 text-red-600 border border-red-100 text-xs font-black px-4 py-2 rounded-full w-full text-center md:w-max">
+                                ❌ 고평가 (체크 미달)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* 진단 결과 패널 */}
               <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-md text-white flex flex-col items-center justify-center text-center gap-3">
-                <span className="text-xs md:text-sm font-bold text-gray-400">펀더멘털 진단 종합 점수</span>
+                <span className="text-xs md:text-sm font-bold text-gray-400">펀더멘털 진단 종합 점수 (10개 항목)</span>
                 <div className="text-4xl md:text-5xl font-black mb-2 flex items-center gap-2">
                   {score === 100 && <span className="text-emerald-400">🟢 100점 (적극 매수)</span>}
-                  {score >= 75 && score < 100 && <span className="text-blue-400">🔵 {score}점 (긍정 검토)</span>}
-                  {score >= 50 && score < 75 && <span className="text-amber-400">🟡 {score}점 (추가 조사)</span>}
+                  {score >= 80 && score < 100 && <span className="text-blue-400">🔵 {score}점 (긍정 검토)</span>}
+                  {score >= 50 && score < 80 && <span className="text-amber-400">🟡 {score}점 (추가 조사)</span>}
                   {score < 50 && <span className="text-red-400">🔴 {score}점 (매수 위험)</span>}
                 </div>
                 <div className="w-full max-w-md bg-slate-600 h-3 md:h-4 rounded-full overflow-hidden shadow-inner">
-                  <div className={`h-full transition-all duration-500 ${score === 100 ? 'bg-emerald-400' : score >= 75 ? 'bg-blue-400' : score >= 50 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${score}%` }}></div>
+                  <div className={`h-full transition-all duration-500 ${score === 100 ? 'bg-emerald-400' : score >= 80 ? 'bg-blue-400' : score >= 50 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${score}%` }}></div>
                 </div>
                 <p className="text-xs md:text-sm text-slate-300 mt-3 font-semibold break-keep">
-                  {score === 100 && "🔥 모든 펀더멘털 기준을 완벽하게 통과했습니다! 시장을 이길 100배주 후보입니다."}
-                  {score >= 75 && score < 100 && "상당히 우수한 기업입니다. 체크되지 않은 1~2개 항목의 리스크를 확인 후 매수하세요."}
-                  {score >= 50 && score < 75 && "절반의 기준만 통과했습니다. 아직 투자하기엔 확신이 부족한 상태입니다."}
-                  {score < 50 && "치명적인 리스크가 많습니다. 소중한 자산을 보호하기 위해 매수를 보류하세요."}
+                  {score === 100 && "🔥 밸류에이션을 포함한 모든 기준을 완벽하게 통과했습니다! 100배주 후보입니다."}
+                  {score >= 80 && score < 100 && "상당히 우수한 기업입니다. 부족한 1~2개 항목의 리스크를 최종 점검하세요."}
+                  {score >= 50 && score < 80 && "기준의 절반 정도만 통과했습니다. 현재 밸류에이션 등 핵심 지표가 매력적이지 않습니다."}
+                  {score < 50 && "치명적인 리스크가 너무 많습니다. 소중한 자산을 보호하기 위해 매수를 보류하세요."}
                 </p>
-              </div>
-
-              {/* 🏛️ [신규 추가] 벤저민 그레이엄 적정 주가 계산기 */}
-              <div className="bg-white border border-gray-200 p-6 md:p-8 rounded-2xl shadow-sm mt-4">
-                <div className="flex items-center gap-2 border-b border-gray-100 pb-4 mb-6">
-                  <span className="text-2xl">🏛️</span>
-                  <div>
-                    <h3 className="text-lg md:text-xl font-black text-gray-900">벤저민 그레이엄 적정 주가 밸류에이션</h3>
-                    <p className="text-xs text-gray-500 font-semibold mt-0.5">공식: 적정 PER = 8.5 + (2 × 기대성장률) | 적정 주가 = EPS × 적정 PER</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 mb-1.5 block">1️⃣ 최근 12개월 EPS (주당순이익 $)</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="예: 6.25" 
-                      value={grahamEps} 
-                      onChange={(e) => setGrahamEps(e.target.value)} 
-                      className="w-full border border-gray-300 rounded-xl p-3 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition" 
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 mb-1.5 block">2️⃣ 향후 기대성장률 (g %)</label>
-                    <input 
-                      type="number" 
-                      step="0.1" 
-                      placeholder="예: 15 (15% 의미)" 
-                      value={grahamGrowth} 
-                      onChange={(e) => setGrahamGrowth(e.target.value)} 
-                      className="w-full border border-gray-300 rounded-xl p-3 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition" 
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-gray-700 mb-1.5 block">3️⃣ 현재 주가 ($)</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="예: 180.50" 
-                      value={grahamCurrentPrice} 
-                      onChange={(e) => setGrahamCurrentPrice(e.target.value)} 
-                      className="w-full border border-gray-300 rounded-xl p-3 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition" 
-                    />
-                  </div>
-                </div>
-
-                {/* 밸류에이션 산출 결과 카운터 */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900 p-5 rounded-2xl text-white">
-                  <div className="flex flex-col justify-center items-center p-3 border-b md:border-b-0 md:border-r border-slate-700">
-                    <span className="text-xs font-bold text-gray-400 mb-1">적정 P/E (Multiple)</span>
-                    <span className="text-2xl font-black text-amber-400">
-                      {growthVal > 0 ? `${fairPE.toFixed(1)} 배` : '-'}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col justify-center items-center p-3 border-b md:border-b-0 md:border-r border-slate-700">
-                    <span className="text-xs font-bold text-gray-400 mb-1">그레이엄 적정 주가</span>
-                    <span className="text-2xl font-black text-emerald-400">
-                      {fairPrice > 0 ? `$${fairPrice.toFixed(2)}` : '-'}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col justify-center items-center p-3">
-                    <span className="text-xs font-bold text-gray-400 mb-1">상승 여력 / 괴리율</span>
-                    <span className={`text-2xl font-black ${upsidePercent >= 0 ? 'text-red-400' : 'text-blue-400'}`}>
-                      {currentPriceVal > 0 && fairPrice > 0 ? `${upsidePercent >= 0 ? '+' : ''}${upsidePercent.toFixed(1)}%` : '-'}
-                    </span>
-                  </div>
-                </div>
               </div>
             </div>
           )}
