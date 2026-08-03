@@ -11,10 +11,14 @@ export default function ArchivePage() {
   const [editModelTarget, setEditModelTarget] = useState('aggressive');
 
   const [budget, setBudget] = useState('');
-  
   const [exchangeRate, setExchangeRate] = useState(1400);
 
   const [checks, setChecks] = useState({ q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false, q8: false, q9: false });
+
+  // 🏛️ 벤저민 그레이엄 밸류에이션 상태
+  const [grahamEps, setGrahamEps] = useState('');
+  const [grahamGrowth, setGrahamGrowth] = useState('');
+  const [grahamCurrentPrice, setGrahamCurrentPrice] = useState('');
 
   const [tabLists, setTabLists] = useState({
     myassets: [],
@@ -377,20 +381,30 @@ export default function ArchivePage() {
     );
   };
 
+  // 🔥 [수정됨] 사용자 요청 반영 9대 매수 체크리스트 데이터
   const checklistData = [
-    { id: 'q1', title: "1. 매출 안정성 및 성장률 점검 (Income Statement)", desc: "수년간 매출이 꾸준히 증가하고 있나요? (💡대형우량주: 우상향 안정성 / 💡고성장주: 연 20~25% 이상 / 💡경기순환주: 사이클상 저점 확인)" },
-    { id: 'q2', title: "2. 애널리스트 의견 비율 (Recommendation Trends)", desc: "다수의 애널리스트가 'Buy(매수)' 이상을 유지하며, 'Sell(매도)' 의견이 지배적이지 않음을 확인하셨나요?" },
-    { id: 'q3', title: "3. 향후 예상 실적 추이 (Financial Forecast)", desc: "향후 1~2년간 꾸준한 실적 성장이 예측되고, 시장의 실적 전망치가 계속 상향 조정 중인가요?" },
-    { id: 'q4', title: "4. 역사적 PER 수준 (Price to Earnings Ratio)", desc: "기업의 역사적인 PER 밴드를 확인했을 때, 현재 주가가 과거 대비 극단적인 고평가(슈팅) 상태가 아님을 확인하셨나요?" },
-    { id: 'q5', title: "5. 배당수익률 및 PEG 확인 (Dividend & PEG)", desc: "💡배당주: 현재 배당수익률이 역사적으로 매력적이고 배당컷 위험이 없나요? / 💡성장주: 이익 성장률 대비 주가(PEG)가 합리적인가요?" },
-    { id: 'q6', title: "6. 애널리스트 목표주가 괴리율 (Target Price)", desc: "글로벌 투자 플랫폼에서 제공하는 애널리스트 목표주가 컨센서스 대비 현재 주가의 상방 여력이 충분한지 점검하셨나요?" },
-    { id: 'q7', title: "7. 벤저민 그레이엄 내재가치 밸류에이션", desc: "벤저민 그레이엄의 적정 주가 공식 등을 활용해, 현재 기업의 내재가치 대비 시장 가격이 턱없이 비싸지 않은지 점검하셨나요?" },
-    { id: 'q8', title: "8. ROE (자기자본이익률) 지속성 점검", desc: "최근 10년간 ROE가 평균 15% 이상을 유지하여, 경영진이 주주 자본을 효과적으로 불려왔는지 확인하셨나요?" },
-    { id: 'q9', title: "9. ROIC (투하자본이익률) 적정성 점검", desc: "ROIC가 10~15% 이상을 지속적으로 유지하며, 기업이 영업을 위해 투입한 자본 대비 훌륭한 이익을 창출해내는지 점검하셨나요?" }
+    { id: 'q1', title: "1. 매출 안정성 및 성장률 점검 (Revenue growth)", desc: "Financials - Revenue growth 확인 (💡대형우량주: 우상향 안정성 / 💡고성장주: 연 20~25% 이상 / 💡경기순환주: 사이클상 저점 확인)" },
+    { id: 'q2', title: "2. PER 수준 (Price to Earnings Ratio)", desc: "Financials - Ratios 현재 PER이 과거 PER 대비 저렴한가요?" },
+    { id: 'q3', title: "3. Forward PE 확인", desc: "Forward PE 가 현재 PER 보다 낮은지 확인하셨나요? (낮을수록 성장하는 기업)" },
+    { id: 'q4', title: "4. PEG 및 배당수익률 확인 (PEG & Dividend)", desc: "성장주: PEG가 1.0 이하인가요? / 💡배당주: 현재 배당수익률이 역사적으로 매력적이고 배당컷 위험이 없나요?" },
+    { id: 'q5', title: "5. ROE (자기자본이익률) 지속성 점검", desc: "최근 10년간 ROE가 평균 15% 이상을 유지하여, 경영진이 주주 자본을 효과적으로 불려왔는지 확인하셨나요?" },
+    { id: 'q6', title: "6. ROIC (투하자본이익률) 적정성 점검", desc: "ROIC가 10~15% 이상을 지속적으로 유지하며, 기업이 영업을 위해 투입한 자본 대비 훌륭한 이익을 창출해내는지 점검하셨나요?" },
+    { id: 'q7', title: "7. 애널리스트 의견 비율 (Recommendation Trends)", desc: "Forecasts 다수의 애널리스트 'Buy(매수)' 의견이 지배적인지 확인하셨나요?" },
+    { id: 'q8', title: "8. 예상 매출 성장률 (Forecast Revenue Growth)", desc: "Revenue Growth Low 의견 확인하셨나요?" },
+    { id: 'q9', title: "9. 예상 주당순이익 성장률 (Forecast EPS)", desc: "EPS Growth Low 의견 확인하셨나요?" }
   ];
 
   const checkedCount = Object.values(checks).filter(Boolean).length;
   const score = Math.round((checkedCount / 9) * 100);
+
+  // 🏛️ 벤저민 그레이엄 적정 주가 계산 로직 (수식: 적정PER = 8.5 + 2g, 적정주가 = EPS * 적정PER)
+  const epsVal = parseFloat(grahamEps) || 0;
+  const growthVal = parseFloat(grahamGrowth) || 0;
+  const currentPriceVal = parseFloat(grahamCurrentPrice) || 0;
+
+  const fairPE = 8.5 + (2 * growthVal);
+  const fairPrice = epsVal * fairPE;
+  const upsidePercent = currentPriceVal > 0 ? ((fairPrice - currentPriceVal) / currentPriceVal) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans pb-24">
@@ -404,10 +418,7 @@ export default function ArchivePage() {
           <button onClick={() => setActiveTab('myassets')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'myassets' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>💰 내 자산</button>
           <button onClick={() => setActiveTab('models')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'models' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📚 모델 포트폴리오</button>
           <button onClick={() => setActiveTab('checker')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'checker' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📊 보유 비중</button>
-          
-          {/* 🔥 탭 통합: '과거수익률'과 '배당률'을 하나로 합친 탭 버튼 */}
           <button onClick={() => setActiveTab('returns')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'returns' ? 'bg-gradient-to-r from-indigo-500 to-rose-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📈 수익률 및 배당</button>
-          
           <button onClick={() => setActiveTab('rebalance')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'rebalance' ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔄 리밸런싱</button>
           <button onClick={() => setActiveTab('checklist')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'checklist' ? 'bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>✅ 종목 진단</button>
         </div>
@@ -452,6 +463,79 @@ export default function ArchivePage() {
                   {score < 50 && "치명적인 리스크가 많습니다. 소중한 자산을 보호하기 위해 매수를 보류하세요."}
                 </p>
               </div>
+
+              {/* 🏛️ [신규 추가] 벤저민 그레이엄 적정 주가 계산기 */}
+              <div className="bg-white border border-gray-200 p-6 md:p-8 rounded-2xl shadow-sm mt-4">
+                <div className="flex items-center gap-2 border-b border-gray-100 pb-4 mb-6">
+                  <span className="text-2xl">🏛️</span>
+                  <div>
+                    <h3 className="text-lg md:text-xl font-black text-gray-900">벤저민 그레이엄 적정 주가 밸류에이션</h3>
+                    <p className="text-xs text-gray-500 font-semibold mt-0.5">공식: 적정 PER = 8.5 + (2 × 기대성장률) | 적정 주가 = EPS × 적정 PER</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 mb-1.5 block">1️⃣ 최근 12개월 EPS (주당순이익 $)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      placeholder="예: 6.25" 
+                      value={grahamEps} 
+                      onChange={(e) => setGrahamEps(e.target.value)} 
+                      className="w-full border border-gray-300 rounded-xl p-3 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition" 
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 mb-1.5 block">2️⃣ 향후 기대성장률 (g %)</label>
+                    <input 
+                      type="number" 
+                      step="0.1" 
+                      placeholder="예: 15 (15% 의미)" 
+                      value={grahamGrowth} 
+                      onChange={(e) => setGrahamGrowth(e.target.value)} 
+                      className="w-full border border-gray-300 rounded-xl p-3 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition" 
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 mb-1.5 block">3️⃣ 현재 주가 ($)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      placeholder="예: 180.50" 
+                      value={grahamCurrentPrice} 
+                      onChange={(e) => setGrahamCurrentPrice(e.target.value)} 
+                      className="w-full border border-gray-300 rounded-xl p-3 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition" 
+                    />
+                  </div>
+                </div>
+
+                {/* 밸류에이션 산출 결과 카운터 */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900 p-5 rounded-2xl text-white">
+                  <div className="flex flex-col justify-center items-center p-3 border-b md:border-b-0 md:border-r border-slate-700">
+                    <span className="text-xs font-bold text-gray-400 mb-1">적정 P/E (Multiple)</span>
+                    <span className="text-2xl font-black text-amber-400">
+                      {growthVal > 0 ? `${fairPE.toFixed(1)} 배` : '-'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col justify-center items-center p-3 border-b md:border-b-0 md:border-r border-slate-700">
+                    <span className="text-xs font-bold text-gray-400 mb-1">그레이엄 적정 주가</span>
+                    <span className="text-2xl font-black text-emerald-400">
+                      {fairPrice > 0 ? `$${fairPrice.toFixed(2)}` : '-'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col justify-center items-center p-3">
+                    <span className="text-xs font-bold text-gray-400 mb-1">상승 여력 / 괴리율</span>
+                    <span className={`text-2xl font-black ${upsidePercent >= 0 ? 'text-red-400' : 'text-blue-400'}`}>
+                      {currentPriceVal > 0 && fairPrice > 0 ? `${upsidePercent >= 0 ? '+' : ''}${upsidePercent.toFixed(1)}%` : '-'}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -472,10 +556,8 @@ export default function ArchivePage() {
             </div>
           )}
 
-          {/* 🔥 탭 통합: 과거수익률과 배당률을 하나로 표시하는 컨테이너 */}
           {activeTab === 'returns' && (
             <div className="flex flex-col gap-6 animate-fade-in">
-              {/* 1. 수익률 파트 (기존 backtest 내용) */}
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-indigo-100 rounded-2xl p-6 shadow-sm">
                 <h2 className="text-xl font-black text-indigo-900 mb-2 flex items-center gap-2">📈 과거 수익률 기반 (10년 시뮬레이션)</h2>
                 <p className="text-xs text-gray-500 font-semibold mb-6">※ 현재 포트폴리오 비중을 유지했을 때의 과거 데이터를 기반으로 한 향후 10년 추정 자산 성장 곡선입니다.</p>
@@ -502,7 +584,6 @@ export default function ArchivePage() {
                 )}
               </div>
 
-              {/* 2. 배당률 파트 (기존 dividend 내용) */}
               <div className="bg-gradient-to-r from-rose-50 to-pink-50 border border-pink-100 rounded-2xl p-6 shadow-sm">
                 <h2 className="text-xl font-black text-pink-900 mb-6 flex items-center gap-2">💸 나의 배당 파이프라인 현황</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
