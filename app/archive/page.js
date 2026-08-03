@@ -71,14 +71,15 @@ export default function ArchivePage() {
   const currentPerVal = parseFloat(grahamCurrentPer) || 0;
   const currentPriceVal = parseFloat(grahamCurrentPrice) || 0;
 
-  // 🔥 요청하신 신규 공식 적용
+  // 공식 1: 적정 PER = 8.5 + (2 * 기대성장률)
   const fairPE = 8.5 + (2 * growthVal);
+  // 공식 2: 적정 주가 = (적정 PER / 현재 PER) * 현재 주가
   const fairPrice = currentPerVal > 0 ? (fairPE / currentPerVal) * currentPriceVal : 0;
   
-  // 괴리율(상승 여력) 산출
+  // 괴리율(상승 여력)
   const upsidePercent = currentPriceVal > 0 && fairPrice > 0 ? ((fairPrice - currentPriceVal) / currentPriceVal) * 100 : 0; 
   
-  // 저평가 판단: 적정 주가가 현재 주가보다 크거나 같으면 통과 (체크)
+  // 저평가 판단 (적정 주가가 현재 주가 이상일 때)
   const isUndervalued = currentPerVal > 0 && growthVal > 0 && currentPriceVal > 0 && fairPrice >= currentPriceVal;
 
   useEffect(() => {
@@ -406,7 +407,6 @@ export default function ArchivePage() {
     );
   };
 
-  // 🔥 1~9번 일반 체크리스트
   const checklistData = [
     { id: 'q1', title: "1. 매출 안정성 및 성장률 점검 (Revenue growth)", desc: "Financials - Revenue growth 확인 (💡대형우량주: 우상향 안정성 / 💡고성장주: 연 20~25% 이상 / 💡경기순환주: 사이클상 저점 확인)" },
     { id: 'q2', title: "2. PER 수준 (Price to Earnings Ratio)", desc: "Financials - Ratios 현재 PER이 과거 PER 대비 저렴한가요?" },
@@ -419,7 +419,6 @@ export default function ArchivePage() {
     { id: 'q9', title: "9. 예상 주당순이익 성장률 (Forecast EPS)", desc: "EPS Growth Low 의견 확인하셨나요?" }
   ];
 
-  // 🔥 10개 기준으로 점수 계산 (10개 모두 만족 시 100점)
   const checkedCount = Object.values(checks).filter(Boolean).length;
   const score = Math.round((checkedCount / 10) * 100);
 
@@ -450,7 +449,6 @@ export default function ArchivePage() {
               </div>
 
               <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
-                {/* 1~9번 일반 체크리스트 항목 */}
                 {checklistData.map((item) => (
                   <label key={item.id} className={`flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl border cursor-pointer transition ${checks[item.id] ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-transparent hover:bg-gray-100'}`}>
                     <input type="checkbox" checked={checks[item.id]} onChange={(e) => setChecks({...checks, [item.id]: e.target.checked})} className="mt-1 w-5 h-5 accent-indigo-600 shrink-0 cursor-pointer" />
@@ -461,73 +459,105 @@ export default function ArchivePage() {
                   </label>
                 ))}
 
-                {/* 🔥 10번 자동 계산 체크리스트 (그레이엄 공식 계산기) */}
+                {/* 🔥 10번 자동 계산 체크리스트 (두 줄 공식 & Finviz 참고 패널 적용) */}
                 <div className={`flex flex-col gap-4 p-4 md:p-5 rounded-xl border transition-all duration-300 ${checks.q10 ? 'bg-emerald-50 border-emerald-300 shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
                   <div className="flex items-start gap-3 md:gap-4">
-                    {/* 자동 체크박스 (클릭 막음 - 계산 결과에 따라 연동) */}
                     <input type="checkbox" readOnly checked={checks.q10} className="mt-1 w-5 h-5 accent-emerald-600 shrink-0 opacity-80 cursor-default" />
                     <div className="flex flex-col w-full">
-                      <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-1">
+                      <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-1 gap-2">
                         <span className={`text-sm md:text-base font-black ${checks.q10 ? 'text-emerald-900' : 'text-gray-800'}`}>10. 벤저민 그레이엄 내재 가치 점검 (자동 판별)</span>
-                        <span className="text-[10px] md:text-xs font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 mt-2 md:mt-0 w-max">
-                          공식: 적정 PER = 8.5 + 2 × 기대성장률 | 적정 주가 = (적정 PER ÷ 현재 PER) × 현재 주가
-                        </span>
+                        
+                        {/* 💡 요청 1: 공식을 명확히 두 줄로 분리 */}
+                        <div className="flex flex-col text-[10px] md:text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 w-full md:w-max leading-relaxed shadow-sm">
+                          <span>① 적정 PER = 8.5 + (2 × 기대성장률)</span>
+                          <span>② 적정 주가 = (적정 PER ÷ 현재 PER) × 현재 주가</span>
+                        </div>
                       </div>
-                      <span className="text-[11px] md:text-xs text-gray-500 leading-relaxed break-keep">
+                      <span className="text-[11px] md:text-xs text-gray-500 leading-relaxed break-keep mt-1">
                         아래 지표를 입력해 주세요. 계산된 '적정 주가'가 '현재 주가'보다 높을 경우(저평가 상태) 자동으로 체크되어 점수에 반영됩니다.
                       </span>
 
-                      {/* ⬇️ 내부 계산기 UI */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-5">
-                        <div className="bg-white p-3 border border-gray-200 rounded-lg">
-                          <label className="text-[10px] font-bold text-gray-500 mb-1.5 block">1️⃣ 기대성장률 (%)</label>
-                          <input type="number" step="0.1" placeholder="예: 15" value={grahamGrowth} onChange={(e) => setGrahamGrowth(e.target.value)} className="w-full font-bold text-sm text-gray-900 outline-none focus:text-indigo-600" />
-                        </div>
-                        <div className="bg-white p-3 border border-gray-200 rounded-lg">
-                          <label className="text-[10px] font-bold text-gray-500 mb-1.5 block">2️⃣ 현재 PER</label>
-                          <input type="number" step="0.1" placeholder="예: 25.4" value={grahamCurrentPer} onChange={(e) => setGrahamCurrentPer(e.target.value)} className="w-full font-bold text-sm text-gray-900 outline-none focus:text-indigo-600" />
-                        </div>
-                        <div className="bg-white p-3 border border-gray-200 rounded-lg">
-                          <label className="text-[10px] font-bold text-gray-500 mb-1.5 block">3️⃣ 현재 주가 ($)</label>
-                          <input type="number" step="0.01" placeholder="예: 150.00" value={grahamCurrentPrice} onChange={(e) => setGrahamCurrentPrice(e.target.value)} className="w-full font-bold text-sm text-gray-900 outline-none focus:text-indigo-600" />
-                        </div>
-                      </div>
+                      {/* 💡 요청 2: 계산기 입력부와 Finviz 화면을 나란히 배치 */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+                        
+                        {/* 🔹 왼쪽: 계산기 영역 */}
+                        <div className="flex flex-col gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-sm focus-within:ring-2 ring-indigo-500 transition">
+                              <label className="text-[10px] font-bold text-gray-500 mb-1.5 block">1️⃣ 기대성장률 (%)</label>
+                              <input type="number" step="0.1" placeholder="예: 15.5" value={grahamGrowth} onChange={(e) => setGrahamGrowth(e.target.value)} className="w-full font-bold text-sm text-gray-900 outline-none" />
+                            </div>
+                            <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-sm focus-within:ring-2 ring-indigo-500 transition">
+                              <label className="text-[10px] font-bold text-gray-500 mb-1.5 block">2️⃣ 현재 PER</label>
+                              <input type="number" step="0.1" placeholder="예: 25.4" value={grahamCurrentPer} onChange={(e) => setGrahamCurrentPer(e.target.value)} className="w-full font-bold text-sm text-gray-900 outline-none" />
+                            </div>
+                            <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-sm focus-within:ring-2 ring-indigo-500 transition">
+                              <label className="text-[10px] font-bold text-gray-500 mb-1.5 block">3️⃣ 현재 주가 ($)</label>
+                              <input type="number" step="0.01" placeholder="예: 150.00" value={grahamCurrentPrice} onChange={(e) => setGrahamCurrentPrice(e.target.value)} className="w-full font-bold text-sm text-gray-900 outline-none" />
+                            </div>
+                          </div>
 
-                      {/* 계산 결과 뷰어 */}
-                      {currentPerVal > 0 && growthVal > 0 && currentPriceVal > 0 && (
-                        <div className="mt-4 flex flex-col md:flex-row justify-between items-center bg-white border border-gray-200 p-3 rounded-lg shadow-sm gap-2">
-                          <div className="flex gap-4 w-full md:w-auto text-center md:text-left justify-center">
-                            <div>
-                              <p className="text-[10px] font-bold text-gray-400">계산된 적정 PER</p>
-                              <p className="text-sm font-black text-gray-800">{fairPE.toFixed(2)}배</p>
+                          {currentPerVal > 0 && growthVal > 0 && currentPriceVal > 0 ? (
+                            <div className="flex flex-col sm:flex-row justify-between items-center bg-white border border-gray-200 p-3 rounded-lg shadow-sm gap-2">
+                              <div className="flex gap-4 w-full sm:w-auto text-center sm:text-left justify-center">
+                                <div>
+                                  <p className="text-[10px] font-bold text-gray-400">계산된 적정 PER</p>
+                                  <p className="text-sm font-black text-gray-800">{fairPE.toFixed(2)}배</p>
+                                </div>
+                                <div className="w-px bg-gray-200 h-8 hidden sm:block"></div>
+                                <div>
+                                  <p className="text-[10px] font-bold text-gray-400">산출된 적정 주가</p>
+                                  <p className="text-sm font-black text-emerald-600">${fairPrice.toFixed(2)}</p>
+                                </div>
+                                <div className="w-px bg-gray-200 h-8 hidden sm:block"></div>
+                                <div>
+                                  <p className="text-[10px] font-bold text-gray-400">상승 여력(괴리율)</p>
+                                  <p className={`text-sm font-black ${upsidePercent >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
+                                    {upsidePercent >= 0 ? '+' : ''}{upsidePercent.toFixed(1)}%
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <div className="w-full sm:w-auto flex justify-center mt-2 sm:mt-0 shrink-0">
+                                {isUndervalued ? (
+                                  <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-black px-4 py-2 rounded-full w-full text-center sm:w-max shadow-sm">
+                                    ✅ 저평가 통과 (점수 +10)
+                                  </span>
+                                ) : (
+                                  <span className="bg-red-50 text-red-600 border border-red-100 text-xs font-black px-4 py-2 rounded-full w-full text-center sm:w-max shadow-sm">
+                                    ❌ 고평가 (미달)
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <div className="w-px bg-gray-200 h-8 hidden md:block"></div>
-                            <div>
-                              <p className="text-[10px] font-bold text-gray-400">산출된 적정 주가</p>
-                              <p className="text-sm font-black text-emerald-600">${fairPrice.toFixed(2)}</p>
-                            </div>
-                            <div className="w-px bg-gray-200 h-8 hidden md:block"></div>
-                            <div>
-                              <p className="text-[10px] font-bold text-gray-400">주가 상승 여력(괴리율)</p>
-                              <p className={`text-sm font-black ${upsidePercent >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
-                                {upsidePercent >= 0 ? '+' : ''}{upsidePercent.toFixed(1)}%
-                              </p>
-                            </div>
+                          ) : (
+                             <div className="bg-gray-100/50 border border-dashed border-gray-300 text-gray-400 text-xs font-bold text-center py-5 rounded-xl">
+                               위 항목에 3가지 수치를 모두 입력하시면<br/>적정 주가 결과가 자동으로 계산됩니다.
+                             </div>
+                          )}
+                        </div>
+
+                        {/* 🔹 오른쪽: Finviz 데이터 뷰어 */}
+                        <div className="flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm h-[200px] lg:h-[180px]">
+                          <div className="flex justify-between items-center px-4 py-2 border-b border-gray-100 bg-gray-50 z-10 relative">
+                            <span className="text-[11px] md:text-xs font-black text-gray-700">📊 Finviz 지표 직접 찾기</span>
+                            <a href="https://finviz.com" target="_blank" rel="noreferrer" className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100 transition shadow-sm border border-blue-100">
+                              ↗ 새 창에서 띄워두고 보기
+                            </a>
                           </div>
-                          
-                          <div className="w-full md:w-auto flex justify-center mt-2 md:mt-0">
-                            {isUndervalued ? (
-                              <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-black px-4 py-2 rounded-full w-full text-center md:w-max">
-                                ✅ 저평가 통과 (점수 +10)
-                              </span>
-                            ) : (
-                              <span className="bg-red-50 text-red-600 border border-red-100 text-xs font-black px-4 py-2 rounded-full w-full text-center md:w-max">
-                                ❌ 고평가 (체크 미달)
-                              </span>
-                            )}
+                          <div className="w-full h-full bg-slate-100 relative">
+                             {/* 사이트 내장 프레임 */}
+                             <iframe src="https://finviz.com/" className="w-full h-full border-0 absolute inset-0 z-10" title="Finviz"></iframe>
+                             
+                             {/* Finviz 보안 정책상 iframe이 막힐 경우 노출되는 안내문 (iframe 뒤에 위치) */}
+                             <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center pointer-events-none z-0 bg-slate-100">
+                               <p className="text-xs font-bold text-gray-500">화면이 하얗게 멈춰있나요?</p>
+                               <p className="text-[10px] text-gray-400 mt-1">해외 사이트 보안 정책으로 내장이 제한된 상태입니다.<br/>상단의 <span className="text-blue-500 font-bold">'새 창에서 보기'</span>를 누르시면 원활하게 이용 가능합니다.</p>
+                             </div>
                           </div>
                         </div>
-                      )}
+
+                      </div>
                     </div>
                   </div>
                 </div>
