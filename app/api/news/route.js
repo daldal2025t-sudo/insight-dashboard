@@ -60,9 +60,16 @@ export async function GET(request) {
   // ========================================================
   // 2. 그 외 일반 카테고리는 기존 네이버 검색 API 유지
   // ========================================================
-  // ⚠️ 부자님의 진짜 네이버 API 키를 아래에 꼭 다시 넣어주세요!
-  const clientId = 'Gd0DKlt9C1otwBXNj4LH'; 
-  const clientSecret = 'Tt3tbjnnyM';
+  // 네이버 API 키는 .env.local 에서 불러옵니다 (코드에 직접 넣지 마세요).
+  const clientId = process.env.NAVER_CLIENT_ID;
+  const clientSecret = process.env.NAVER_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    return NextResponse.json(
+      { error: 'NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 환경변수가 설정되지 않았습니다. .env.local 파일을 확인해 주세요.' },
+      { status: 500 }
+    );
+  }
 
   try {
     const response = await fetch(`https://openapi.naver.com/v1/search/news.json?query=${encodeURI(query)}&display=10&sort=sim`, {
