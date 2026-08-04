@@ -208,47 +208,47 @@ export default function JournalPage() {
           className="w-full border border-gray-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-black font-semibold transition bg-white shadow-sm"
         />
 
-        {/* 목록 */}
-        <div className="flex flex-col gap-3">
+        {/* 목록: 표 스타일 (한 줄에 최대한 담고, 자리 부족하면 아이디어만 다음 줄로) */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {sortedEntries.length === 0 ? (
-            <div className="bg-white rounded-2xl p-10 text-center text-gray-400 font-bold text-sm border border-gray-100 shadow-sm">
+            <div className="p-10 text-center text-gray-400 font-bold text-sm">
               {entries.length === 0 ? '아직 기록이 없어요. 위에서 첫 매매 기록을 추가해 보세요!' : '검색 결과가 없어요.'}
             </div>
-          ) : sortedEntries.map((entry) => {
-            const price = parseFloat(entry.buyPrice) || 0;
-            const qty = parseFloat(entry.quantity) || 0;
-            const total = price * qty;
-            return (
-              <div key={entry.id} className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
-                <div className="flex justify-between items-start gap-3">
-                  <div className="min-w-0">
-                    <p className="font-black text-gray-900 text-sm md:text-base truncate">{entry.ticker}</p>
-                    <p className="text-[11px] md:text-xs text-gray-400 font-semibold mt-0.5">{entry.buyDate}</p>
-                  </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    <button onClick={() => handleEdit(entry)} className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md hover:bg-blue-100 transition">수정</button>
-                    <button onClick={() => handleDelete(entry.id)} className="text-xs font-bold text-red-500 bg-red-50 px-2.5 py-1 rounded-md hover:bg-red-100 transition">삭제</button>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs md:text-sm font-semibold text-gray-600 border-t border-gray-50 pt-3">
-                  <span>매수가: <strong className="text-gray-900">{price.toLocaleString('ko-KR')}</strong></span>
-                  {entry.quantity !== '' && entry.quantity !== undefined && (
-                    <>
-                      <span>수량: <strong className="text-gray-900">{qty.toLocaleString('ko-KR')}</strong></span>
-                      <span>총액: <strong className="text-gray-900">{total.toLocaleString('ko-KR')}</strong></span>
-                    </>
-                  )}
-                </div>
-
-                {entry.idea && (
-                  <p className="text-xs md:text-sm text-gray-700 bg-slate-50 rounded-xl p-3 leading-relaxed whitespace-pre-wrap break-keep">
-                    {entry.idea}
-                  </p>
-                )}
+          ) : (
+            <>
+              {/* 표 헤더: 좁은 화면에서는 생략 */}
+              <div className="hidden sm:flex items-center gap-x-3 px-4 md:px-5 py-2.5 border-b border-gray-100 bg-slate-50 text-[10px] md:text-[11px] font-black text-gray-400 tracking-wider">
+                <span className="shrink-0 w-[76px]">날짜</span>
+                <span className="shrink-0 w-[130px]">종목명</span>
+                <span className="shrink-0 w-[90px] text-right">매수가</span>
+                <span className="shrink-0 w-[50px] text-right">수량</span>
+                <span className="shrink-0 w-[56px]"></span>
+                <span className="flex-1 min-w-[120px]">투자 아이디어</span>
               </div>
-            );
-          })}
+
+              <div className="flex flex-col">
+                {sortedEntries.map((entry) => {
+                  const price = parseFloat(entry.buyPrice) || 0;
+                  const qty = parseFloat(entry.quantity) || 0;
+                  return (
+                    <div key={entry.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 px-4 md:px-5 py-3 border-b border-gray-50 last:border-0 hover:bg-slate-50/60 transition">
+                      <span className="shrink-0 w-[76px] text-xs font-bold text-gray-400">{entry.buyDate}</span>
+                      <span className="shrink-0 max-w-[160px] sm:w-[130px] truncate font-black text-gray-900 text-sm" title={entry.ticker}>{entry.ticker}</span>
+                      <span className="shrink-0 sm:w-[90px] text-right text-sm font-bold text-gray-900">{price.toLocaleString('ko-KR')}</span>
+                      <span className="shrink-0 sm:w-[50px] text-right text-xs font-semibold text-gray-500">{entry.quantity !== '' && entry.quantity !== undefined ? qty.toLocaleString('ko-KR') : '-'}</span>
+                      <span className="shrink-0 sm:w-[56px] flex gap-1">
+                        <button onClick={() => handleEdit(entry)} title="수정" className="text-xs w-6 h-6 flex items-center justify-center rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 transition">✏️</button>
+                        <button onClick={() => handleDelete(entry.id)} title="삭제" className="text-xs w-6 h-6 flex items-center justify-center rounded-md text-red-500 bg-red-50 hover:bg-red-100 transition">🗑️</button>
+                      </span>
+                      <span className="flex-1 min-w-[140px] basis-full sm:basis-auto text-xs md:text-sm text-gray-600 leading-snug whitespace-pre-wrap break-keep">
+                        {entry.idea || <span className="text-gray-300">-</span>}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       </main>
     </div>
