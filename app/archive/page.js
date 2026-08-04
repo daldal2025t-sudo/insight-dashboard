@@ -479,7 +479,7 @@ export default function ArchivePage() {
                       
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mt-2 gap-3">
                         <span className="text-[11px] md:text-xs text-gray-500 leading-relaxed break-keep flex-1">
-                          아래 지표를 입력해 주세요. 현재주가<적정주가 경우 자동체크 (키움증권 - 적정주가 크로스체크)
+                          아래 지표를 입력해 주세요. (키움증권 - 적정주가 크로스체크)
                         </span>
                         
                         {/* 💡 Finviz 새창 열기 버튼 (iframe 대체) */}
@@ -491,7 +491,7 @@ export default function ArchivePage() {
                       {/* ⬇️ 내부 계산기 UI (넓게 1단으로 배치) */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
                         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-sm focus-within:ring-2 ring-indigo-500 transition">
-                          <label className="text-[10px] font-bold text-gray-500 mb-1.5 block">1️⃣ EPS next 5y (%)</label>
+                          <label className="text-[10px] font-bold text-gray-500 mb-1.5 block">1️⃣ 기대성장률 (%)</label>
                           <input type="number" step="0.1" placeholder="예: 15.5" value={grahamGrowth} onChange={(e) => setGrahamGrowth(e.target.value)} className="w-full font-bold text-sm text-gray-900 outline-none" />
                         </div>
                         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-sm focus-within:ring-2 ring-indigo-500 transition">
