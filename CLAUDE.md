@@ -22,6 +22,7 @@ Next.js 16 App Router project (mixed JS/TSX: `app/layout.tsx` is TypeScript, all
 - `/` (`app/page.tsx`) — main dashboard: live stock/macro ticker (`StockTicker`) + category news cards (`NewsCard`), both client components that poll the API routes below on mount.
 - `/archive` (`app/archive/page.js`) — "ETF 포트폴리오 빌더" (portfolio builder). A single large client component (~800+ lines) with six tabs (내 자산 / 모델 포트폴리오 / 보유 비중 / 수익률 및 배당 / 리밸런싱 / 종목 진단), all derived state (portfolio weights, sector/size/style exposure, CAGR-weighted backtest projection, Benjamin Graham fair-value calculator) computed inline on every render from `masterPool` (fetched) + `tabLists`/`quantities` (local state).
 - `/infinite` (`app/infinite/page.js`) — thin wrapper that embeds an external site (`https://fire-gate.app/`) in a full-screen iframe.
+- `/journal` (`app/journal/page.js`) — personal trade journal (매매일지): ticker, buy date, buy price, quantity, and a free-text rationale per entry. Pure client component, no API calls; entries live only in `localStorage` (see below), so the data is private to whichever browser/device created it and is not visible to other visitors of the deployed site.
 
 ### API routes (`app/api/*/route.js`)
 
@@ -33,4 +34,4 @@ All three are server-side data-fetching proxies with no persistence layer; they 
 
 ### Client-side persistence
 
-`/archive` persists user portfolio state directly to `localStorage` under `kijay_tab_configurations` (tab → holdings/weights) and `kijay_etf_counts_v2` (share quantities) — there is no backend/database, so this state is per-browser only.
+`/archive` persists user portfolio state directly to `localStorage` under `kijay_tab_configurations` (tab → holdings/weights) and `kijay_etf_counts_v2` (share quantities). `/journal` persists trade-journal entries under `kijay_trade_journal`. There is no backend/database, so all of this state is per-browser only — it does not sync across devices and is not visible to other visitors of the site.
