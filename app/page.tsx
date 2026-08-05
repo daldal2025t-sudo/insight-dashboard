@@ -5,12 +5,27 @@ import Link from 'next/link';
 function NewsCard({ category }) {
   const [news, setNews] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    setIsLoading(true);
+    setError(null);
     fetch(`/api/news?query=${category}`)
       .then((res) => res.json())
-      .then((data) => { setNews(data); setIsLoading(false); })
-      .catch((err) => console.error(err));
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setNews(data);
+        } else {
+          setNews([]);
+          setError((data && data.error) || '알 수 없는 형식의 응답을 받았습니다.');
+        }
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setError(err?.message || '네트워크 오류가 발생했습니다.');
+        setIsLoading(false);
+      });
   }, [category]);
 
   const cleanTitle = (title) => title.replace(/<[^>]*>?/gm, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
@@ -19,6 +34,16 @@ function NewsCard({ category }) {
     return (
       <article className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex justify-center items-center h-[520px]">
         <span className="text-gray-400 font-bold">{category} 뉴스를 수집 중입니다... ⏳</span>
+      </article>
+    );
+  }
+
+  if (error) {
+    return (
+      <article className="bg-white rounded-2xl p-6 shadow-sm border border-red-100 flex flex-col justify-center items-center h-[520px] gap-2 text-center px-8">
+        <span className="text-2xl">⚠️</span>
+        <p className="text-red-500 font-bold text-sm">{category} 뉴스를 불러오지 못했습니다</p>
+        <p className="text-gray-400 text-xs break-keep">{error}</p>
       </article>
     );
   }
@@ -52,13 +77,27 @@ function NewsCard({ category }) {
 function StockTicker() {
   const [liveData, setLiveData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchStocks = () => {
     setIsLoading(true);
+    setError(null);
     fetch('/api/stocks')
       .then(res => res.json())
-      .then(data => { setLiveData(data); setIsLoading(false); })
-      .catch(err => { console.error(err); setIsLoading(false); });
+      .then(data => {
+        if (Array.isArray(data)) {
+          setLiveData(data);
+        } else {
+          setLiveData([]);
+          setError((data && data.error) || '알 수 없는 형식의 응답을 받았습니다.');
+        }
+        setIsLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setError(err?.message || '네트워크 오류가 발생했습니다.');
+        setIsLoading(false);
+      });
   };
 
   useEffect(() => { fetchStocks(); }, []);
@@ -103,6 +142,12 @@ function StockTicker() {
 
   return (
     <section className="mb-12 flex flex-col gap-4">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-xs md:text-sm font-bold px-4 py-3 rounded-xl flex items-center justify-between gap-3">
+          <span>⚠️ 시세를 불러오지 못했습니다: {error}</span>
+          <button onClick={fetchStocks} className="shrink-0 text-xs bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-700 transition">다시 시도</button>
+        </div>
+      )}
       <div>
         <div className="bg-gray-500 text-white px-4 py-2 flex justify-between items-center rounded-t-xl">
           <h2 className="text-sm md:text-base font-bold tracking-tight">글로벌 핵심 증시 (선물/현물 듀얼)</h2>

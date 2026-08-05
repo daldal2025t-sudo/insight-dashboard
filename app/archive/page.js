@@ -412,9 +412,9 @@ export default function ArchivePage() {
     { id: 'q1', title: "1. 매출 안정성 및 성장률 점검 (Revenue growth)", desc: "Financials - Revenue growth 확인 (💡대형우량주: 우상향 안정성 / 💡고성장주: 연 20~25% 이상 / 💡경기순환주: 사이클상 저점 확인)" },
     { id: 'q2', title: "2. PER 수준 (Price to Earnings Ratio)", desc: "Financials - Ratios 현재 PER이 과거 PER 대비 저렴한가요?" },
     { id: 'q3', title: "3. Forward PE 확인", desc: "Forward PE 가 현재 PER 보다 낮은지 확인하셨나요? (낮을수록 성장하는 기업)" },
-    { id: 'q4', title: "4. PEG 및 배당수익률 확인 (PEG & Dividend)", desc: "성장주: PEG가 1.0 이하인가요? / 💡배당주: 현재 배당수익률이 역사적으로 매력적이고 배당컷 위험이 없나요?" },
-    { id: 'q5', title: "5. ROE (자기자본이익률) 지속성 점검", desc: "최근 10년간 ROE가 평균 15% 이상을 유지하여, 경영진이 주주 자본을 효과적으로 불려왔는지 확인하셨나요?" },
-    { id: 'q6', title: "6. ROIC (투하자본이익률) 적정성 점검", desc: "ROIC가 10~15% 이상을 지속적으로 유지하며, 기업이 영업을 위해 투입한 자본 대비 훌륭한 이익을 창출해내는지 점검하셨나요?" },
+    { id: 'q4', title: "4. PEG 및 배당수익률 확인 (PEG & Dividend)", desc: "💡성장주: PEG가 1.0 이하인가요? / 💡배당주: 현재 배당수익률이 역사적으로 매력적인가요?" },
+    { id: 'q5', title: "5. ROE (자기자본이익률) 지속성 점검", desc: "최근 10년 ROE 평균 15% 이상 유지 & ROE 편차가 크지 않음, 경영진이 주주 자본을 효과적으로 불려왔는지 확인하셨나요?" },
+    { id: 'q6', title: "6. ROIC (투하자본이익률) 적정성 점검", desc: "ROIC 15% 이상 경제적해자를 지닌 우량기업, 10% 이상 경쟁력 있는 기업 → 경제적해자 여부 확인 (네트워크, 비용우위, 무형자산, 전환비용)" },
     { id: 'q7', title: "7. 애널리스트 의견 비율 (Recommendation Trends)", desc: "Forecasts 다수의 애널리스트 'Buy(매수)' 의견이 지배적인지 확인하셨나요?" },
     { id: 'q8', title: "8. 예상 매출 성장률 (Forecast Revenue Growth)", desc: "Revenue Growth Low 의견 확인하셨나요?" },
     { id: 'q9', title: "9. 예상 주당순이익 성장률 (Forecast EPS)", desc: "EPS Growth Low 의견 확인하셨나요?" }
