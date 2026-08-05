@@ -1,6 +1,59 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { unstable_cache } from 'next/cache';
+import YahooFinance from 'yahoo-finance2';
+
+const yahooFinance = new YahooFinance();
+
+// 섹터 비중은 몇 달 단위로만 바뀌는 데이터라, 매 요청마다 새로 조회하지 않고 7일간 캐싱한다.
+// (가격은 여전히 캐싱 없이 실시간으로 조회됨 - fetchYahooPrice 참고)
+const SECTOR_CACHE_SECONDS = 60 * 60 * 24 * 7; // 7일
+
+// 야후 파이낸스 sectorWeightings 필드명 → 이 프로젝트에서 쓰는 섹터 키 매핑
+const SECTOR_KEY_MAP = {
+  realestate: 'realestate',
+  consumer_cyclical: 'consumer_cyc',
+  basic_materials: 'basic',
+  consumer_defensive: 'consumer_def',
+  technology: 'tech',
+  communication_services: 'communication',
+  financial_services: 'finance',
+  utilities: 'utilities',
+  industrials: 'ind',
+  energy: 'energy',
+  healthcare: 'health',
+};
+
+// ETF 하나의 실시간 섹터 비중을 야후 파이낸스에서 조회. 실패/데이터 없음 시 null 반환(호출부에서 하드코딩 값으로 폴백).
+const fetchLiveSectorsRaw = async (symbol) => {
+  try {
+    const result = await yahooFinance.quoteSummary(symbol, { modules: ['topHoldings'] });
+    const rawList = result?.topHoldings?.sectorWeightings;
+    if (!Array.isArray(rawList) || rawList.length === 0) return null;
+
+    const sectors = {};
+    for (const entry of rawList) {
+      for (const [yahooKey, val] of Object.entries(entry)) {
+        const mappedKey = SECTOR_KEY_MAP[yahooKey];
+        if (mappedKey && typeof val === 'number') {
+          sectors[mappedKey] = Math.round(val * 1000) / 10; // 0.283 -> 28.3(%)
+        }
+      }
+    }
+    return Object.keys(sectors).length > 0 ? sectors : null;
+  } catch (e) {
+    // 국내 상장 ETF(.KS)는 야후에 이 데이터가 없는 경우가 많음 - 정상적인 상황이라 조용히 폴백
+    return null;
+  }
+};
+
+// symbol별로 결과를 7일간 캐싱하는 래퍼. 같은 symbol이면 캐시가 만료되기 전까지 야후에 재요청하지 않는다.
+const fetchLiveSectors = unstable_cache(
+  fetchLiveSectorsRaw,
+  ['etf-sector-weightings'],
+  { revalidate: SECTOR_CACHE_SECONDS }
+);
 
 export async function GET() {
   const masterPool = {
@@ -163,8 +216,21 @@ export async function GET() {
     const poolItems = Object.entries(masterPool).map(([code, config]) => ({
       code, name: config.name, symbol: config.symbol, xray: config
     }));
-    const fetchedPool = await Promise.all(poolItems.map(fetchYahooPrice));
-    return NextResponse.json({ pool: fetchedPool });
+
+    const [fetchedPool, liveSectorsList] = await Promise.all([
+      Promise.all(poolItems.map(fetchYahooPrice)),
+      Promise.all(poolItems.map((item) => fetchLiveSectors(item.symbol))),
+    ]);
+
+    const mergedPool = fetchedPool.map((item, idx) => {
+      const liveSectors = liveSectorsList[idx];
+      if (liveSectors && item.xray) {
+        return { ...item, xray: { ...item.xray, sectors: liveSectors, sectorsSource: 'live' } };
+      }
+      return item.xray ? { ...item, xray: { ...item.xray, sectorsSource: 'fallback' } } : item;
+    });
+
+    return NextResponse.json({ pool: mergedPool });
   } catch (error) {
     return NextResponse.json({ error: 'ETF 마스터 풀 동기화 실패' }, { status: 500 });
   }
