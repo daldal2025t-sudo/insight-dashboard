@@ -17,6 +17,8 @@ Next.js 16 App Router project (mixed JS/TSX: `app/layout.tsx` is TypeScript, all
 
 **`next.config.mjs` disables build-time checks**: `eslint.ignoreDuringBuilds` and `typescript.ignoreBuildErrors` are both `true`. TypeScript `strict` is on in `tsconfig.json`, but type/lint errors will not fail `npm run build` — don't assume a clean build means the code type-checks or lints cleanly.
 
+`app/error.js` is a root error boundary (client component) that catches unhandled render errors anywhere under `app/` and shows a message + reset button instead of a blank page. Client components that fetch from the API routes below (`NewsCard`/`StockTicker` in particular) also defensively check `Array.isArray(data)` before using the response, since a non-2xx/error-shaped JSON response would otherwise crash the component.
+
 ### Routes
 
 - `/` (`app/page.tsx`) — main dashboard: live stock/macro ticker (`StockTicker`) + category news cards (`NewsCard`), both client components that poll the API routes below on mount.
@@ -26,11 +28,12 @@ Next.js 16 App Router project (mixed JS/TSX: `app/layout.tsx` is TypeScript, all
 
 ### API routes (`app/api/*/route.js`)
 
-All three are server-side data-fetching proxies with no persistence layer; they use `cache: 'no-store'` and spoof a browser `User-Agent` when calling external services.
+These are server-side data-fetching proxies with no persistence layer; price data uses `cache: 'no-store'` and spoofs a browser `User-Agent` when calling external services. Two routes (`api/etfs`'s sector weightings, `api/sector-performance`) deliberately deviate from the no-cache pattern — see below.
 
-- `api/news` — for `query === '해외증시'`, scrapes Naver Finance news listing directly (`cheerio` + `iconv-lite` to decode EUC-KR), falling back to the Naver Search API on scrape failure. All other categories go straight to the Naver Search News API. **Naver API `clientId`/`clientSecret` are hardcoded in this file**, not read from environment variables — there's no `.env` in the repo (only `.env*` in `.gitignore`).
+- `api/news` — for `query === '해외증시'`, scrapes Naver Finance news listing directly (`cheerio` + `iconv-lite` to decode EUC-KR), falling back to the Naver Search API on scrape failure. All other categories go straight to the Naver Search News API. Naver API credentials are read from `NAVER_CLIENT_ID`/`NAVER_CLIENT_SECRET` env vars (see `.env.example`); the route returns a 500 with a clear message if they're unset.
 - `api/stocks` (`dynamic = 'force-dynamic'`) — pulls a fixed list of indices/ETFs/macro tickers from Yahoo Finance's undocumented chart endpoint (`query2.finance.yahoo.com/v8/finance/chart/...`). Has custom logic to pick pre-market/regular/post-market price and compute change % differently for ETFs (`TQQQ`/`SOXL`) vs. indices, plus a secondary "spot" price fetch for futures symbols (e.g. `ES=F` → `^GSPC`).
-- `api/etfs` (`dynamic = 'force-dynamic'`) — contains a large hardcoded `masterPool` object (~80 Korean- and US-listed ETFs) with static metadata (sector/size/style weights, dividend yield, CAGR by period) baked into the source, then fetches a live price for each symbol from the same Yahoo Finance chart endpoint and merges it in.
+- `api/etfs` (`dynamic = 'force-dynamic'`) — contains a large hardcoded `masterPool` object (~80 Korean- and US-listed ETFs) with static metadata (size/style weights, dividend yield, CAGR by period) baked into the source, then fetches a live price for each symbol from the same Yahoo Finance chart endpoint and merges it in. Sector weightings are the exception to "hardcoded": they're fetched live per-symbol via the `yahoo-finance2` package (`quoteSummary` → `topHoldings.sectorWeightings`), wrapped in `unstable_cache` with a 7-day revalidate (`SECTOR_CACHE_SECONDS`), and fall back to the hardcoded `sectors` value in `masterPool` when Yahoo has no data for that symbol (common for `.KS`-listed ETFs) — each item's `xray.sectorsSource` is `'live'` or `'fallback'` accordingly.
+- `api/sector-performance` — independent of `api/etfs`; computes 1-year return and a long-term (up to 10y, shorter for younger funds) annualized CAGR for the 11 GICS sector SPDR ETFs (XLK, XLF, XLV, XLY, XLP, XLI, XLE, XLU, XLB, XLRE, XLC) from `yahoo-finance2`'s `chart()` module (weekly candles). Entire result is wrapped in `unstable_cache` with a 7-day revalidate. Consumed lazily by `/archive`'s 리밸런싱 tab (fetched only once that tab is opened, not on every `/archive` page load).
 
 ### Client-side persistence
 

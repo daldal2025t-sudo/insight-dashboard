@@ -33,6 +33,11 @@ export default function ArchivePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+  // 📊 리밸런싱 탭: 섹터별 ETF 수익률 (7일 캐싱, 탭을 열 때만 조회)
+  const [sectorPerf, setSectorPerf] = useState(null);
+  const [sectorPerfLoading, setSectorPerfLoading] = useState(false);
+  const [sectorPerfError, setSectorPerfError] = useState(null);
+
   useEffect(() => {
     const savedTabLists = localStorage.getItem('kijay_tab_configurations');
     if (savedTabLists) { 
@@ -65,6 +70,28 @@ export default function ArchivePage() {
       })
       .catch(err => console.error('환율 연동 실패:', err));
   }, []);
+
+  // 리밸런싱 탭을 처음 열 때만 섹터별 ETF 수익률을 조회 (서버에서 7일 캐싱됨)
+  useEffect(() => {
+    if (activeTab !== 'rebalance' || sectorPerf !== null || sectorPerfLoading) return;
+    setSectorPerfLoading(true);
+    setSectorPerfError(null);
+    fetch('/api/sector-performance')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data?.sectors)) {
+          setSectorPerf(data.sectors);
+        } else {
+          setSectorPerfError((data && data.error) || '알 수 없는 형식의 응답을 받았습니다.');
+        }
+        setSectorPerfLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setSectorPerfError(err?.message || '네트워크 오류가 발생했습니다.');
+        setSectorPerfLoading(false);
+      });
+  }, [activeTab, sectorPerf, sectorPerfLoading]);
 
   // 🏛️ 그레이엄 밸류에이션 실시간 계산 및 10번 자동 체크 로직
   const growthVal = parseFloat(grahamGrowth) || 0;
@@ -673,6 +700,53 @@ export default function ArchivePage() {
                   <button onClick={() => setCyclePhase('late')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'late' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>🍂 3. 후기/둔화기</button>
                   <button onClick={() => setCyclePhase('recession')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'recession' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>❄️ 4. 침체 국면</button>
                 </div>
+              </div>
+
+              <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h3 className="font-black text-gray-900 text-sm md:text-base mb-4">📊 미국 섹터별 ETF 수익률 (실시간, 7일마다 갱신)</h3>
+
+                {sectorPerfLoading && (
+                  <div className="text-center py-8 text-gray-400 font-bold text-sm">섹터별 수익률 데이터를 불러오는 중... ⏳</div>
+                )}
+
+                {sectorPerfError && (
+                  <div className="text-center py-8 text-red-500 font-bold text-sm">⚠️ {sectorPerfError}</div>
+                )}
+
+                {sectorPerf && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs md:text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 text-gray-400 font-bold text-left">
+                          <th className="py-2 pr-2">섹터</th>
+                          <th className="py-2 pr-2">티커</th>
+                          <th className="py-2 pr-2 text-right">최근 1년</th>
+                          <th className="py-2 text-right">장기 연평균(CAGR)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sectorPerf.map((s) => (
+                          <tr key={s.symbol} className="border-b border-gray-50 last:border-0">
+                            <td className="py-2 pr-2 font-bold text-gray-800">{s.label}</td>
+                            <td className="py-2 pr-2 text-gray-400 font-semibold">{s.symbol}</td>
+                            <td className={`py-2 pr-2 text-right font-black ${s.oneYearReturn == null ? 'text-gray-300' : s.oneYearReturn >= 0 ? 'text-pink-600' : 'text-blue-500'}`}>
+                              {s.oneYearReturn == null ? '-' : `${s.oneYearReturn > 0 ? '+' : ''}${s.oneYearReturn}%`}
+                            </td>
+                            <td className={`py-2 text-right font-black ${s.longTermCagr == null ? 'text-gray-300' : s.longTermCagr >= 0 ? 'text-pink-600' : 'text-blue-500'}`}>
+                              {s.longTermCagr == null ? '-' : `${s.longTermCagr > 0 ? '+' : ''}${s.longTermCagr}%`}
+                              {s.dataYears != null && s.dataYears < 9.5 && (
+                                <span className="text-[9px] text-gray-400 font-medium ml-1">({s.dataYears}년)</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p className="text-[10px] text-gray-400 font-medium mt-3 break-keep">
+                      * 상장한 지 10년이 안 된 ETF(부동산·커뮤니케이션 등)는 상장 이후 실제 기간을 기준으로 연평균을 계산했어요. 데이터는 7일마다 새로 갱신됩니다.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {totalPortfolioValue === 0 ? (
