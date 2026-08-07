@@ -9,7 +9,18 @@ function todayStr() {
 }
 
 function emptyForm() {
-  return { ticker: '', buyDate: todayStr(), buyPrice: '', quantity: '', idea: '' };
+  return { stockName: '', symbol: '', buyDate: todayStr(), buyPrice: '', quantity: '', idea: '' };
+}
+
+// 옛 스키마(종목명/티커 통합 입력)로 저장된 기록을 새 스키마로 변환.
+// "엔비디아(NVDA)" 같은 문자열에서 괄호 안 티커를 최대한 추출하고, 실패하면 symbol은 비워둔다(그 항목만 현재가가 '-'로 표시됨).
+function migrateEntry(entry) {
+  if (entry.symbol !== undefined) return entry; // 이미 새 스키마
+  const legacy = entry.ticker || '';
+  const match = legacy.match(/\(([A-Za-z0-9.\-^]+)\)\s*$/);
+  const extractedSymbol = match ? match[1].toUpperCase() : '';
+  const stockName = match ? legacy.slice(0, match.index).trim() : legacy;
+  return { ...entry, stockName, symbol: extractedSymbol };
 }
 
 const CHECKLIST_DATA = [
@@ -33,6 +44,8 @@ export default function JournalPage() {
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
+  const [priceMap, setPriceMap] = useState({}); // { 'NVDA': { price, currency } }
+  const [priceLoading, setPriceLoading] = useState(false);
 
   // ===== 종목 진단(체크리스트 + 그레이엄 계산기) 상태 =====
   const [checks, setChecks] = useState({ q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false, q8: false, q9: false, q10: false });
@@ -40,11 +53,11 @@ export default function JournalPage() {
   const [grahamCurrentPer, setGrahamCurrentPer] = useState('');
   const [grahamCurrentPrice, setGrahamCurrentPrice] = useState('');
 
-  // 최초 로드: localStorage에서 매매일지 불러오기
+  // 최초 로드: localStorage에서 매매일지 불러오기 (옛 스키마는 자동 변환)
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) setEntries(JSON.parse(saved));
+      if (saved) setEntries(JSON.parse(saved).map(migrateEntry));
     } catch (e) {}
     setIsLoaded(true);
   }, []);
@@ -55,6 +68,34 @@ export default function JournalPage() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   }, [entries, isLoaded]);
 
+  // 기록된 티커들의 현재가를 실시간으로 조회 (캐싱 없음 - 항상 최신)
+  const uniqueSymbols = useMemo(() => {
+    const set = new Set(entries.map(en => (en.symbol || '').trim().toUpperCase()).filter(Boolean));
+    return [...set];
+  }, [entries]);
+  const uniqueSymbolsKey = uniqueSymbols.join(',');
+
+  const fetchPrices = () => {
+    if (uniqueSymbols.length === 0) { setPriceMap({}); return; }
+    setPriceLoading(true);
+    fetch(`/api/journal-quotes?symbols=${encodeURIComponent(uniqueSymbolsKey)}`)
+      .then(res => res.json())
+      .then(data => {
+        setPriceMap((data && data.quotes) || {});
+        setPriceLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setPriceLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    fetchPrices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, uniqueSymbolsKey]);
+
   const handleChange = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
   const resetForm = () => {
@@ -64,18 +105,20 @@ export default function JournalPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.ticker.trim() || !form.buyDate || !form.buyPrice) {
-      alert('종목명, 매수일자, 매수가는 필수로 입력해 주세요.');
+    if (!form.symbol.trim() || !form.buyDate || !form.buyPrice) {
+      alert('티커, 매수일자, 매수가는 필수로 입력해 주세요. (종목명은 선택 입력이에요)');
       return;
     }
 
+    const normalizedForm = { ...form, symbol: form.symbol.trim().toUpperCase(), stockName: form.stockName.trim() };
+
     if (editingId) {
-      setEntries(prev => prev.map(en => en.id === editingId ? { ...en, ...form } : en));
+      setEntries(prev => prev.map(en => en.id === editingId ? { ...en, ...normalizedForm } : en));
     } else {
       const newEntry = {
         id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         createdAt: Date.now(),
-        ...form,
+        ...normalizedForm,
       };
       setEntries(prev => [newEntry, ...prev]);
     }
@@ -85,7 +128,8 @@ export default function JournalPage() {
   const handleEdit = (entry) => {
     setEditingId(entry.id);
     setForm({
-      ticker: entry.ticker,
+      stockName: entry.stockName || '',
+      symbol: entry.symbol || '',
       buyDate: entry.buyDate,
       buyPrice: entry.buyPrice,
       quantity: entry.quantity,
@@ -101,9 +145,11 @@ export default function JournalPage() {
   };
 
   const sortedEntries = useMemo(() => {
+    const q = searchQuery.toLowerCase();
     const filtered = entries.filter(en =>
-      en.ticker.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (en.idea || '').toLowerCase().includes(searchQuery.toLowerCase())
+      (en.stockName || '').toLowerCase().includes(q) ||
+      (en.symbol || '').toLowerCase().includes(q) ||
+      (en.idea || '').toLowerCase().includes(q)
     );
     return [...filtered].sort((a, b) => {
       if (a.buyDate !== b.buyDate) return b.buyDate.localeCompare(a.buyDate);
@@ -185,15 +231,25 @@ export default function JournalPage() {
                 {editingId ? '✏️ 기록 수정' : '➕ 새 매매 기록 추가'}
               </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1.5">종목명 / 티커 *</label>
+                  <label className="block text-xs font-bold text-gray-500 mb-1.5">종목명 (선택)</label>
                   <input
                     type="text"
-                    value={form.ticker}
-                    onChange={(e) => handleChange('ticker', e.target.value)}
-                    placeholder="예: 엔비디아(NVDA)"
+                    value={form.stockName}
+                    onChange={(e) => handleChange('stockName', e.target.value)}
+                    placeholder="예: 엔비디아"
                     className="w-full border border-gray-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-black font-semibold transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1.5">티커 *</label>
+                  <input
+                    type="text"
+                    value={form.symbol}
+                    onChange={(e) => handleChange('symbol', e.target.value)}
+                    placeholder="예: NVDA, 005930.KS"
+                    className="w-full border border-gray-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-black font-semibold transition uppercase placeholder:normal-case"
                   />
                 </div>
                 <div>
@@ -254,14 +310,23 @@ export default function JournalPage() {
               </div>
             </form>
 
-            {/* 검색 */}
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="🔍 종목명 또는 메모 검색..."
-              className="w-full border border-gray-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-black font-semibold transition bg-white shadow-sm"
-            />
+            {/* 검색 + 시세 새로고침 */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="🔍 종목명, 티커 또는 메모 검색..."
+                className="flex-1 border border-gray-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-black font-semibold transition bg-white shadow-sm"
+              />
+              <button
+                onClick={fetchPrices}
+                disabled={priceLoading}
+                className="shrink-0 text-xs font-bold text-gray-600 bg-white border border-gray-300 px-4 rounded-xl hover:bg-gray-50 transition shadow-sm disabled:opacity-50"
+              >
+                {priceLoading ? '⏳' : '↻'} 시세 새로고침
+              </button>
+            </div>
 
             {/* 목록: 표 스타일 (한 줄에 최대한 담고, 자리 부족하면 아이디어만 다음 줄로) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -274,9 +339,11 @@ export default function JournalPage() {
                   {/* 표 헤더: 좁은 화면에서는 생략 */}
                   <div className="hidden sm:flex items-center gap-x-3 px-4 md:px-5 py-2.5 border-b border-gray-100 bg-slate-50 text-[10px] md:text-[11px] font-black text-gray-400 tracking-wider">
                     <span className="shrink-0 w-[76px]">날짜</span>
-                    <span className="shrink-0 w-[130px]">종목명</span>
+                    <span className="shrink-0 w-[130px]">종목명 / 티커</span>
                     <span className="shrink-0 w-[90px] text-right">매수가</span>
                     <span className="shrink-0 w-[50px] text-right">수량</span>
+                    <span className="shrink-0 w-[90px] text-right">현재가</span>
+                    <span className="shrink-0 w-[70px] text-right">등락률</span>
                     <span className="shrink-0 w-[56px]"></span>
                     <span className="flex-1 min-w-[120px]">투자 아이디어</span>
                   </div>
@@ -285,12 +352,28 @@ export default function JournalPage() {
                     {sortedEntries.map((entry) => {
                       const price = parseFloat(entry.buyPrice) || 0;
                       const qty = parseFloat(entry.quantity) || 0;
+                      const symbolKey = (entry.symbol || '').trim().toUpperCase();
+                      const quote = priceMap[symbolKey];
+                      const currentPrice = quote?.price ?? null;
+                      const changePct = currentPrice != null && price > 0 ? ((currentPrice - price) / price) * 100 : null;
+                      const displayName = entry.stockName || entry.symbol || '(종목명 없음)';
                       return (
-                        <div key={entry.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 px-4 md:px-5 py-3 border-b border-gray-50 last:border-0 hover:bg-slate-50/60 transition">
+                        <div key={entry.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 md:px-5 py-3 border-b border-gray-50 last:border-0 hover:bg-slate-50/60 transition">
                           <span className="shrink-0 w-[76px] text-xs font-bold text-gray-400">{entry.buyDate}</span>
-                          <span className="shrink-0 max-w-[160px] sm:w-[130px] truncate font-black text-gray-900 text-sm" title={entry.ticker}>{entry.ticker}</span>
+                          <span className="shrink-0 max-w-[160px] sm:w-[130px] min-w-0 flex flex-col justify-center">
+                            <span className="truncate font-black text-gray-900 text-sm" title={displayName}>{displayName}</span>
+                            {entry.stockName && entry.symbol && (
+                              <span className="text-[9px] text-gray-400 font-semibold truncate">{entry.symbol}</span>
+                            )}
+                          </span>
                           <span className="shrink-0 sm:w-[90px] text-right text-sm font-bold text-gray-900">{price.toLocaleString('ko-KR')}</span>
                           <span className="shrink-0 sm:w-[50px] text-right text-xs font-semibold text-gray-500">{entry.quantity !== '' && entry.quantity !== undefined ? qty.toLocaleString('ko-KR') : '-'}</span>
+                          <span className="shrink-0 sm:w-[90px] text-right text-sm font-bold text-gray-900">
+                            {currentPrice != null ? currentPrice.toLocaleString('ko-KR', { maximumFractionDigits: 2 }) : <span className="text-gray-300 font-normal">-</span>}
+                          </span>
+                          <span className={`shrink-0 sm:w-[70px] text-right text-xs font-black ${changePct == null ? 'text-gray-300 font-normal' : changePct >= 0 ? 'text-pink-600' : 'text-blue-500'}`}>
+                            {changePct != null ? `${changePct > 0 ? '+' : ''}${changePct.toFixed(1)}%` : '-'}
+                          </span>
                           <span className="shrink-0 sm:w-[56px] flex gap-1">
                             <button onClick={() => handleEdit(entry)} title="수정" className="text-xs w-6 h-6 flex items-center justify-center rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 transition">✏️</button>
                             <button onClick={() => handleDelete(entry.id)} title="삭제" className="text-xs w-6 h-6 flex items-center justify-center rounded-md text-red-500 bg-red-50 hover:bg-red-100 transition">🗑️</button>
