@@ -22,9 +22,9 @@ Next.js 16 App Router project (mixed JS/TSX: `app/layout.tsx` is TypeScript, all
 ### Routes
 
 - `/` (`app/page.tsx`) — main dashboard: live stock/macro ticker (`StockTicker`) + category news cards (`NewsCard`), both client components that poll the API routes below on mount.
-- `/archive` (`app/archive/page.js`) — "ETF 포트폴리오 빌더" (portfolio builder). A single large client component (~800+ lines) with six tabs (내 자산 / 모델 포트폴리오 / 보유 비중 / 수익률 및 배당 / 리밸런싱 / 종목 진단), all derived state (portfolio weights, sector/size/style exposure, CAGR-weighted backtest projection, Benjamin Graham fair-value calculator) computed inline on every render from `masterPool` (fetched) + `tabLists`/`quantities` (local state).
+- `/archive` (`app/archive/page.js`) — "ETF 포트폴리오 빌더" (portfolio builder). A single large client component (~700+ lines) with five tabs (내 자산 / 모델 포트폴리오 / 보유 비중 / 수익률 및 배당 / 리밸런싱), all derived state (portfolio weights, sector/size/style exposure, CAGR-weighted backtest projection) computed inline on every render from `masterPool` (fetched) + `tabLists`/`quantities` (local state). The 리밸런싱 tab also lazily fetches `/api/sector-performance` (only once, when that tab is first opened).
 - `/infinite` (`app/infinite/page.js`) — thin wrapper that embeds an external site (`https://fire-gate.app/`) in a full-screen iframe.
-- `/journal` (`app/journal/page.js`) — personal trade journal (매매일지): ticker, buy date, buy price, quantity, and a free-text rationale per entry. Pure client component, no API calls; entries live only in `localStorage` (see below), so the data is private to whichever browser/device created it and is not visible to other visitors of the deployed site.
+- `/journal` (`app/journal/page.js`) — two tabs: 매매일지 (trade journal: ticker, buy date, buy price, quantity, free-text rationale per entry; persisted to `localStorage`, so private to whichever browser/device created it) and 종목 진단 (10-item fundamentals checklist + a Benjamin Graham fair-value calculator, moved here from `/archive`; this tab's state — checkbox states, Graham calculator inputs — is not persisted, it resets on reload, matching its original behavior on `/archive`).
 
 ### API routes (`app/api/*/route.js`)
 
