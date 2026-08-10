@@ -6,11 +6,12 @@ function NewsCard({ category }) {
   const [news, setNews] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     setIsLoading(true);
     setError(null);
-    fetch(`/api/news?query=${category}`)
+    fetch(`/api/news?query=${category}&display=20`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -52,7 +53,17 @@ function NewsCard({ category }) {
     <article className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition flex flex-col justify-between">
       <div>
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-gray-900">{category}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-xl font-bold text-gray-900">{category}</h3>
+            {news.length > 10 && (
+              <button
+                onClick={() => setExpanded((prev) => !prev)}
+                className="text-xs font-bold text-blue-600 hover:text-blue-700 transition"
+              >
+                {expanded ? '접기 ▴' : '더보기 ▾'}
+              </button>
+            )}
+          </div>
           <span className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-md">{news.length} articles</span>
         </div>
         {news[0] && (
@@ -62,7 +73,7 @@ function NewsCard({ category }) {
           </a>
         )}
         <ul className="flex flex-col gap-3">
-          {news.slice(1, 10).map((article, index) => (
+          {news.slice(1, expanded ? 20 : 10).map((article, index) => (
             <li key={index} className="flex gap-3 items-start group">
               <span className="text-blue-500 font-bold text-sm shrink-0">{index + 1 < 10 ? `0${index + 1}` : index + 1}</span>
               <a href={article.link} target="_blank" rel="noreferrer" className="text-gray-600 text-sm line-clamp-2 group-hover:text-gray-900 transition">{cleanTitle(article.title)}</a>

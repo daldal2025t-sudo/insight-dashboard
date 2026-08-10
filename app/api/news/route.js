@@ -5,6 +5,8 @@ import iconv from 'iconv-lite';
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   let query = searchParams.get('query') || '경제';
+  // '더보기' 지원: 요청한 개수만큼(기본 10개, 최대 20개) 가져옵니다.
+  const displayCount = Math.min(Math.max(parseInt(searchParams.get('display'), 10) || 10, 1), 20);
 
   // ========================================================
   // 🔴 1. [해외증시] 탭: 지정해주신 네이버 금융 사이트 직접 스크래핑
@@ -12,7 +14,7 @@ export async function GET(request) {
   if (query === '해외증시') {
     try {
       const targetUrl = 'https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=403';
-      
+
       // 사람인 척 위장해서 해당 페이지의 문서를 통째로 요청합니다.
       const response = await fetch(targetUrl, {
         headers: {
@@ -25,29 +27,29 @@ export async function GET(request) {
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       const html = iconv.decode(buffer, 'EUC-KR');
-      
+
       // html 문서를 핀셋(cheerio)으로 조작할 수 있게 불러옵니다.
       const $ = cheerio.load(html);
       const newsList = [];
 
       // '.articleSubject a'는 네이버 금융 뉴스 제목에 붙어있는 고유 이름표입니다.
       $('.articleSubject a').each((index, element) => {
-        if (index >= 10) return false; // 위에서부터 딱 10개만 뽑고 멈춥니다.
-        
+        if (index >= displayCount) return false; // 요청한 개수만큼만 뽑고 멈춥니다.
+
         const title = $(element).attr('title') || $(element).text();
         let link = $(element).attr('href');
-        
+
         // 링크가 완전한 주소가 아니면 앞부분을 붙여 완성해 줍니다.
         if (link && link.startsWith('/')) {
           link = 'https://finance.naver.com' + link;
         }
-        
+
         if (title && link) {
           newsList.push({ title: title.trim(), link });
         }
       });
 
-      // 성공적으로 10개를 뽑았다면 화면으로 전달!
+      // 뽑혔다면 화면으로 전달! (페이지에 데이터가 displayCount보다 적으면 있는 만큼만)
       if (newsList.length > 0) {
         return NextResponse.json(newsList);
       }
@@ -72,7 +74,7 @@ export async function GET(request) {
   }
 
   try {
-    const response = await fetch(`https://openapi.naver.com/v1/search/news.json?query=${encodeURI(query)}&display=10&sort=sim`, {
+    const response = await fetch(`https://openapi.naver.com/v1/search/news.json?query=${encodeURI(query)}&display=${displayCount}&sort=sim`, {
       headers: {
         'X-Naver-Client-Id': clientId,
         'X-Naver-Client-Secret': clientSecret,
