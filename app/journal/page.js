@@ -23,6 +23,47 @@ function migrateEntry(entry) {
   return { ...entry, stockName, symbol: extractedSymbol };
 }
 
+// 클립보드 복사 (HTTPS/localhost가 아니면 navigator.clipboard가 막히므로 execCommand로 폴백)
+function copyTextToClipboard(text, onSuccess, onFail) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(onSuccess).catch(onFail);
+    return;
+  }
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    ok ? onSuccess() : onFail();
+  } catch (e) {
+    onFail();
+  }
+}
+
+// 다른 기기로 옮기기: JSON -> UTF-8 바이트 -> Base64 "코드" 문자열
+function encodeToCode(data) {
+  const json = JSON.stringify(data);
+  const bytes = new TextEncoder().encode(json);
+  let binary = '';
+  bytes.forEach((b) => { binary += String.fromCharCode(b); });
+  return btoa(binary);
+}
+
+function decodeFromCode(code) {
+  const binary = atob(code.trim());
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const json = new TextDecoder().decode(bytes);
+  const parsed = JSON.parse(json);
+  if (!Array.isArray(parsed)) throw new Error('코드 형식이 올바르지 않습니다.');
+  return parsed;
+}
+
 const CHECKLIST_DATA = [
   { id: 'q1', title: "1. 매출 안정성 및 성장률 점검 (Revenue growth)", desc: "Financials - Revenue growth 확인 (💡대형우량주: 우상향 안정성 / 💡고성장주: 연 20~25% 이상 / 💡경기순환주: 사이클상 저점 확인)" },
   { id: 'q2', title: "2. PER 수준 (Price to Earnings Ratio)", desc: "Financials - Ratios 현재 PER이 과거 PER 대비 저렴한가요?" },
@@ -46,6 +87,13 @@ export default function JournalPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [priceMap, setPriceMap] = useState({}); // { 'NVDA': { price, currency } }
   const [priceLoading, setPriceLoading] = useState(false);
+
+  // 다른 기기로 옮기기 (내보내기/가져오기) 패널 상태
+  const [showTransferPanel, setShowTransferPanel] = useState(false);
+  const [transferMode, setTransferMode] = useState('export'); // 'export' | 'import'
+  const [exportCode, setExportCode] = useState('');
+  const [importInput, setImportInput] = useState('');
+  const [importResult, setImportResult] = useState(null); // { added, skipped } | { error }
 
   // ===== 종목 진단(체크리스트 + 그레이엄 계산기) 상태 =====
   const [checks, setChecks] = useState({ q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false, q8: false, q9: false, q10: false });
@@ -156,6 +204,70 @@ export default function JournalPage() {
       return (b.createdAt || 0) - (a.createdAt || 0);
     });
   }, [entries, searchQuery]);
+
+  // 📋 표로 복사 (TSV) - 지금 화면에 보이는(검색 필터 반영된) 목록을 구글 시트/엑셀에 표로 붙여넣을 수 있게 복사
+  const handleCopyForSheets = () => {
+    if (sortedEntries.length === 0) {
+      alert('복사할 기록이 없어요.');
+      return;
+    }
+    const header = ['날짜', '종목명', '티커', '매수가', '수량', '매수 아이디어'];
+    const rows = sortedEntries.map((entry) => [
+      entry.buyDate,
+      entry.stockName || '',
+      entry.symbol || '',
+      entry.buyPrice,
+      entry.quantity || '',
+      (entry.idea || '').replace(/\r?\n/g, ' ').replace(/\t/g, ' ').trim(),
+    ].join('\t'));
+    const tsv = [header.join('\t'), ...rows].join('\n');
+
+    copyTextToClipboard(
+      tsv,
+      () => alert(`✅ ${sortedEntries.length}건을 표 형식으로 복사했어요. 구글 시트/엑셀에 붙여넣기(Ctrl+V)만 하시면 표로 들어가요.`),
+      () => alert('⚠️ 복사에 실패했어요. 브라우저 클립보드 권한을 확인해 주세요.')
+    );
+  };
+
+  // ⬆️⬇️ 다른 기기로 옮기기
+  const handleOpenExport = () => {
+    setExportCode(encodeToCode(entries));
+    setTransferMode('export');
+    setImportResult(null);
+    setShowTransferPanel(true);
+  };
+
+  const handleOpenImport = () => {
+    setImportInput('');
+    setImportResult(null);
+    setTransferMode('import');
+    setShowTransferPanel(true);
+  };
+
+  const handleCopyExportCode = () => {
+    copyTextToClipboard(
+      exportCode,
+      () => alert('✅ 코드가 복사됐어요. 옮기려는 기기의 매매일지 화면에서 "가져오기"에 붙여넣으세요.'),
+      () => alert('⚠️ 복사에 실패했어요. 코드 상자를 눌러 직접 선택한 뒤 복사해 주세요.')
+    );
+  };
+
+  const handleApplyImport = () => {
+    if (!importInput.trim()) return;
+    try {
+      const imported = decodeFromCode(importInput).map(migrateEntry);
+      const existingIds = new Set(entries.map((en) => en.id));
+      const newOnes = imported
+        .filter((en) => !en.id || !existingIds.has(en.id))
+        .map((en) => (en.id ? en : { ...en, id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}` }));
+      const skipped = imported.length - newOnes.length;
+
+      setEntries((prev) => [...newOnes, ...prev]); // 기존 데이터는 그대로 두고, 새 항목만 추가 (덮어쓰기 아님)
+      setImportResult({ added: newOnes.length, skipped });
+    } catch (e) {
+      setImportResult({ error: '코드 형식이 올바르지 않아요. 정확히 복사했는지 확인해 주세요.' });
+    }
+  };
 
   const totalInvested = useMemo(() => {
     return entries.reduce((sum, en) => {
@@ -327,6 +439,77 @@ export default function JournalPage() {
                 {priceLoading ? '⏳' : '↻'} 시세 새로고침
               </button>
             </div>
+
+            {/* 표로 복사 / 다른 기기로 옮기기 */}
+            <div className="flex flex-wrap gap-2">
+              <button onClick={handleCopyForSheets} className="text-xs font-bold text-gray-600 bg-white border border-gray-300 px-4 py-2 rounded-xl hover:bg-gray-50 transition shadow-sm">
+                📋 표로 복사
+              </button>
+              <button onClick={handleOpenExport} className="text-xs font-bold text-gray-600 bg-white border border-gray-300 px-4 py-2 rounded-xl hover:bg-gray-50 transition shadow-sm">
+                ⬆️ 다른 기기로 옮기기 (내보내기)
+              </button>
+              <button onClick={handleOpenImport} className="text-xs font-bold text-gray-600 bg-white border border-gray-300 px-4 py-2 rounded-xl hover:bg-gray-50 transition shadow-sm">
+                ⬇️ 다른 기기에서 가져오기
+              </button>
+            </div>
+
+            {showTransferPanel && (
+              <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col gap-3">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-extrabold text-gray-900 text-sm md:text-base">
+                    {transferMode === 'export' ? '⬆️ 내보내기 코드' : '⬇️ 가져오기'}
+                  </h3>
+                  <button onClick={() => setShowTransferPanel(false)} className="text-gray-400 hover:text-gray-600 text-xs font-bold">✕ 닫기</button>
+                </div>
+
+                {transferMode === 'export' ? (
+                  <>
+                    <p className="text-xs text-gray-500 break-keep">
+                      아래 코드를 복사해서, 옮기고 싶은 기기의 매매일지 화면에서 "⬇️ 다른 기기에서 가져오기"에 붙여넣으세요. (총 {entries.length}건)
+                    </p>
+                    <textarea
+                      readOnly
+                      value={exportCode}
+                      onFocus={(e) => e.target.select()}
+                      rows={4}
+                      className="w-full border border-gray-300 rounded-xl p-2.5 text-[10px] font-mono outline-none bg-slate-50 resize-none break-all"
+                    />
+                    <button onClick={handleCopyExportCode} className="self-start bg-black text-white px-4 py-2 rounded-lg font-bold text-xs hover:bg-gray-800 transition shadow-sm">
+                      코드 복사
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-gray-500 break-keep">
+                      다른 기기에서 받은 코드를 아래에 붙여넣으세요. 기존 기록은 지워지지 않고, 새 기록만 추가돼요.
+                    </p>
+                    <textarea
+                      value={importInput}
+                      onChange={(e) => setImportInput(e.target.value)}
+                      rows={4}
+                      placeholder="여기에 코드를 붙여넣으세요"
+                      className="w-full border border-gray-300 rounded-xl p-2.5 text-[10px] font-mono outline-none focus:ring-2 focus:ring-black transition resize-none break-all"
+                    />
+                    <button
+                      onClick={handleApplyImport}
+                      disabled={!importInput.trim()}
+                      className="self-start bg-black text-white px-4 py-2 rounded-lg font-bold text-xs hover:bg-gray-800 transition shadow-sm disabled:opacity-40"
+                    >
+                      가져오기 적용
+                    </button>
+                    {importResult && (
+                      importResult.error ? (
+                        <p className="text-xs text-red-500 font-bold">⚠️ {importResult.error}</p>
+                      ) : (
+                        <p className="text-xs text-emerald-600 font-bold">
+                          ✅ {importResult.added}건 추가했어요{importResult.skipped > 0 ? ` (중복 ${importResult.skipped}건은 건너뜀)` : ''}.
+                        </p>
+                      )
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {/* 목록: 표 스타일 (한 줄에 최대한 담고, 자리 부족하면 아이디어만 다음 줄로) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

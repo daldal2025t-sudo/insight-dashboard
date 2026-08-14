@@ -129,6 +129,9 @@ function StockTicker() {
         </span>
         <div className="flex flex-col items-end gap-1 shrink-0">
           <div className="flex items-center gap-0.5 md:gap-1 leading-none">
+            {item.primaryLabel && (
+              <span className="text-[9px] bg-gray-300 text-gray-600 px-1 rounded font-bold tracking-tighter">{item.primaryLabel}</span>
+            )}
             {item.isUp === true && <svg className="w-3 h-3 md:w-3.5 md:h-3.5 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
             {item.isUp === false && <svg className="w-3 h-3 md:w-3.5 md:h-3.5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
             <span className={`text-[10px] md:text-xs font-semibold ${item.isUp === true ? 'text-pink-600' : item.isUp === false ? 'text-blue-500' : 'text-gray-500'}`}>
@@ -137,7 +140,7 @@ function StockTicker() {
           </div>
           {item.spotChange && (
             <div className="flex items-center gap-0.5 md:gap-1 leading-none mt-1">
-              <span className="text-[9px] bg-gray-300 text-gray-600 px-1 rounded font-bold tracking-tighter">현</span>
+              <span className="text-[9px] bg-gray-300 text-gray-600 px-1 rounded font-bold tracking-tighter">{item.secondaryLabel || '현'}</span>
               {item.isSpotUp === true && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l7 9h-4v5H7v-5H3l7-9z" /></svg>}
               {item.isSpotUp === false && <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 17l-7-9h4V3h6v5h4l-7 9z" /></svg>}
               <span className={`text-[10px] md:text-[11px] font-semibold ${item.isSpotUp === true ? 'text-pink-600' : item.isSpotUp === false ? 'text-blue-500' : 'text-gray-500'}`}>
