@@ -16,8 +16,8 @@ const INDEX_LIST = [
   { symbol: '^GSPC', label: 'S&P 500' },
   { symbol: '^NDX', label: '나스닥100' },
   { symbol: '^DJI', label: '다우지수' },
-  { symbol: 'IVW', label: 'S&P500 성장' },
-  { symbol: 'IVE', label: 'S&P500 가치' },
+  { symbol: 'VOOG', label: 'S&P500 성장' },
+  { symbol: 'VOOV', label: 'S&P500 가치' },
   { symbol: '^VIX', label: '변동성지수' },
   { symbol: 'SHY', label: '단기채권' },
   { symbol: 'IEF', label: '중기채권' },
@@ -54,6 +54,20 @@ const TOP_COMPANY_LIST = [
   { symbol: 'V', label: '비자' },
   { symbol: 'XOM', label: '엑슨모빌' },
   { symbol: 'JNJ', label: '존슨앤존슨' },
+];
+
+// "월300 투자 공식" - 국내 상장된 미국지수 추종 ETF (원화, KRX)
+const MONTHLY_FORMULA_LIST = [
+  { symbol: '360200.KS', label: 'ACE 미국S&P500' },
+  { symbol: '367380.KS', label: 'ACE 미국나스닥100' },
+  { symbol: '402970.KS', label: 'ACE 미국배당다우존스' },
+  { symbol: '309230.KS', label: 'ACE 미국WideMoat동일가중' },
+  { symbol: '429000.KS', label: 'TIGER 미국S&P500배당귀족' },
+  { symbol: '458760.KS', label: 'TIGER 미국배당+7%프리미엄다우존스' },
+  { symbol: '449180.KS', label: 'KODEX 미국S&P500(H)' },
+  { symbol: '449190.KS', label: 'KODEX 미국나스닥100(H)' },
+  { symbol: '452360.KS', label: 'SOL 미국배당다우존스(H)' },
+  { symbol: '280930.KS', label: 'KODEX 미국러셀2000(H)' },
 ];
 
 function round2(n) {
@@ -154,12 +168,13 @@ async function fetchGroup(list) {
 }
 
 async function computeWeeklyDataRaw() {
-  const [indices, sectors, topCompanies] = await Promise.all([
+  const [indices, sectors, topCompanies, monthlyFormula] = await Promise.all([
     fetchGroup(INDEX_LIST),
     fetchGroup(SECTOR_LIST),
     fetchGroup(TOP_COMPANY_LIST),
+    fetchGroup(MONTHLY_FORMULA_LIST),
   ]);
-  return { indices, sectors, topCompanies, updatedAt: new Date().toISOString() };
+  return { indices, sectors, topCompanies, monthlyFormula, updatedAt: new Date().toISOString() };
 }
 
 const getWeeklyData = unstable_cache(computeWeeklyDataRaw, ['weekly-data-v1'], {

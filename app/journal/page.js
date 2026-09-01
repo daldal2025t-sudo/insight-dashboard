@@ -750,6 +750,7 @@ export default function JournalPage() {
 
             {weeklyData && (
               <>
+                <WeeklyDataTable title="월300 투자 공식" rows={weeklyData.monthlyFormula} priceDecimals={0} />
                 <WeeklyDataTable title="주요 지수" rows={weeklyData.indices} />
                 <WeeklyDataTable title="주요 섹터" rows={weeklyData.sectors} />
                 <WeeklyDataTable title="S&P500 상위 기업" rows={weeklyData.topCompanies} />
@@ -773,7 +774,7 @@ function PctCell({ value }) {
   );
 }
 
-function WeeklyDataTable({ title, rows }) {
+function WeeklyDataTable({ title, rows, priceDecimals = 2 }) {
   if (!rows || rows.length === 0) return null;
   return (
     <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -801,7 +802,7 @@ function WeeklyDataTable({ title, rows }) {
                   <span className="text-gray-400 font-semibold ml-1.5">{r.symbol}</span>
                 </td>
                 <td className="py-2 pr-2 text-right font-semibold text-gray-700">
-                  {r.price == null ? '-' : r.price.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {r.price == null ? '-' : r.price.toLocaleString('ko-KR', { minimumFractionDigits: priceDecimals, maximumFractionDigits: priceDecimals })}
                 </td>
                 <PctCell value={r.drawdownFromHigh} />
                 <PctCell value={r.weekChange} />
