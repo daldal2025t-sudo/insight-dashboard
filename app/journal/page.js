@@ -101,6 +101,11 @@ export default function JournalPage() {
   const [grahamCurrentPer, setGrahamCurrentPer] = useState('');
   const [grahamCurrentPrice, setGrahamCurrentPrice] = useState('');
 
+  // ===== 주간데이터 탭: 주요 지수/섹터/S&P500 상위 기업 (매주 토요일 서버에서 갱신) =====
+  const [weeklyData, setWeeklyData] = useState(null);
+  const [weeklyLoading, setWeeklyLoading] = useState(false);
+  const [weeklyError, setWeeklyError] = useState(null);
+
   // 최초 로드: localStorage에서 매매일지 불러오기 (옛 스키마는 자동 변환)
   useEffect(() => {
     try {
@@ -143,6 +148,27 @@ export default function JournalPage() {
     fetchPrices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded, uniqueSymbolsKey]);
+
+  // 주간데이터 탭을 처음 열 때만 조회 (서버에서 매주 토요일마다 갱신됨)
+  useEffect(() => {
+    if (activeTab !== 'weekly' || weeklyData !== null || weeklyLoading) return;
+    setWeeklyLoading(true);
+    setWeeklyError(null);
+    fetch('/api/weekly-data')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.error) {
+          setWeeklyError(data.error);
+        } else {
+          setWeeklyData(data);
+        }
+        setWeeklyLoading(false);
+      })
+      .catch(err => {
+        setWeeklyError(err?.message || '네트워크 오류가 발생했습니다.');
+        setWeeklyLoading(false);
+      });
+  }, [activeTab, weeklyData, weeklyLoading]);
 
   const handleChange = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -321,6 +347,7 @@ export default function JournalPage() {
         <div className="flex gap-2 bg-gray-200 p-1 rounded-xl w-full overflow-x-auto whitespace-nowrap hide-scrollbar">
           <button onClick={() => setActiveTab('journal')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'journal' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📝 매매일지</button>
           <button onClick={() => setActiveTab('checklist')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'checklist' ? 'bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>✅ 종목 진단</button>
+          <button onClick={() => setActiveTab('weekly')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'weekly' ? 'bg-gradient-to-r from-emerald-700 to-teal-800 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📊 주간데이터</button>
         </div>
 
         {activeTab === 'journal' && (
@@ -440,15 +467,15 @@ export default function JournalPage() {
               </button>
             </div>
 
-            {/* 표로 복사 / 다른 기기로 옮기기 */}
-            <div className="flex flex-wrap gap-2">
-              <button onClick={handleCopyForSheets} className="text-xs font-bold text-gray-600 bg-white border border-gray-300 px-4 py-2 rounded-xl hover:bg-gray-50 transition shadow-sm">
+            {/* 표로 복사 / 다른 기기로 옮기기: 모바일에서는 세로로 쌓아서 옆으로 튀어나오지 않게 */}
+            <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-2">
+              <button onClick={handleCopyForSheets} className="w-full sm:w-auto text-xs font-bold text-gray-600 bg-white border border-gray-300 px-4 py-2 rounded-xl hover:bg-gray-50 transition shadow-sm">
                 📋 표로 복사
               </button>
-              <button onClick={handleOpenExport} className="text-xs font-bold text-gray-600 bg-white border border-gray-300 px-4 py-2 rounded-xl hover:bg-gray-50 transition shadow-sm">
+              <button onClick={handleOpenExport} className="w-full sm:w-auto text-xs font-bold text-gray-600 bg-white border border-gray-300 px-4 py-2 rounded-xl hover:bg-gray-50 transition shadow-sm">
                 ⬆️ 다른 기기로 옮기기 (내보내기)
               </button>
-              <button onClick={handleOpenImport} className="text-xs font-bold text-gray-600 bg-white border border-gray-300 px-4 py-2 rounded-xl hover:bg-gray-50 transition shadow-sm">
+              <button onClick={handleOpenImport} className="w-full sm:w-auto text-xs font-bold text-gray-600 bg-white border border-gray-300 px-4 py-2 rounded-xl hover:bg-gray-50 transition shadow-sm">
                 ⬇️ 다른 기기에서 가져오기
               </button>
             </div>
@@ -697,7 +724,97 @@ export default function JournalPage() {
             </div>
           </div>
         )}
+
+        {activeTab === 'weekly' && (
+          <div className="flex flex-col gap-6 animate-fade-in">
+            <div className="bg-gradient-to-r from-emerald-800 to-teal-900 text-white p-5 md:p-6 rounded-2xl shadow-sm flex flex-col gap-2">
+              <span className="text-[10px] tracking-widest font-black text-emerald-300 uppercase">Weekly Market Snapshot</span>
+              <h2 className="text-xl md:text-2xl font-black">📊 주간데이터</h2>
+              <p className="text-xs md:text-sm text-emerald-100 opacity-80 mt-1">
+                주요 지수 · 섹터 · S&amp;P500 상위 기업의 흐름을 한눈에 봐요. 매주 토요일 자동으로 갱신돼요.
+              </p>
+              {weeklyData?.updatedAt && (
+                <p className="text-[10px] text-emerald-200 opacity-70">
+                  마지막 갱신: {new Date(weeklyData.updatedAt).toLocaleString('ko-KR')}
+                </p>
+              )}
+            </div>
+
+            {weeklyLoading && (
+              <div className="text-center py-10 text-gray-400 font-bold text-sm bg-white rounded-2xl shadow-sm border border-gray-100">주간 데이터를 불러오는 중... ⏳</div>
+            )}
+
+            {weeklyError && (
+              <div className="text-center py-10 text-red-500 font-bold text-sm bg-white rounded-2xl shadow-sm border border-gray-100">⚠️ {weeklyError}</div>
+            )}
+
+            {weeklyData && (
+              <>
+                <WeeklyDataTable title="주요 지수" rows={weeklyData.indices} />
+                <WeeklyDataTable title="주요 섹터" rows={weeklyData.sectors} />
+                <WeeklyDataTable title="S&P500 상위 기업" rows={weeklyData.topCompanies} />
+              </>
+            )}
+          </div>
+        )}
       </main>
+    </div>
+  );
+}
+
+// 퍼센트 값을 색깔 있는 텍스트로 렌더링 (양수: 핑크, 음수: 파랑 - 앱 전체 색상 규칙과 동일)
+function PctCell({ value }) {
+  if (value == null) return <td className="py-2 pr-2 text-right font-black text-gray-300">-</td>;
+  const cls = value >= 0 ? 'text-pink-600' : 'text-blue-500';
+  return (
+    <td className={`py-2 pr-2 text-right font-black ${cls}`}>
+      {value > 0 ? '+' : ''}{value}%
+    </td>
+  );
+}
+
+function WeeklyDataTable({ title, rows }) {
+  if (!rows || rows.length === 0) return null;
+  return (
+    <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
+      <h3 className="font-black text-gray-900 text-sm md:text-base mb-4">{title}</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs md:text-sm whitespace-nowrap">
+          <thead>
+            <tr className="border-b border-gray-100 text-gray-400 font-bold text-left">
+              <th className="py-2 pr-2">종목</th>
+              <th className="py-2 pr-2 text-right">기준가</th>
+              <th className="py-2 pr-2 text-right">52주 고점 대비</th>
+              <th className="py-2 pr-2 text-right">주중(%)</th>
+              <th className="py-2 pr-2 text-right">월중(%)</th>
+              <th className="py-2 pr-2 text-right">1M(%)</th>
+              <th className="py-2 pr-2 text-right">3M(%)</th>
+              <th className="py-2 pr-2 text-right">6M(%)</th>
+              <th className="py-2 text-right">12M(%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.symbol} className="border-b border-gray-50 last:border-0">
+                <td className="py-2 pr-2 font-bold text-gray-800">
+                  {r.label}
+                  <span className="text-gray-400 font-semibold ml-1.5">{r.symbol}</span>
+                </td>
+                <td className="py-2 pr-2 text-right font-semibold text-gray-700">
+                  {r.price == null ? '-' : r.price.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <PctCell value={r.drawdownFromHigh} />
+                <PctCell value={r.weekChange} />
+                <PctCell value={r.monthChange} />
+                <PctCell value={r.m1} />
+                <PctCell value={r.m3} />
+                <PctCell value={r.m6} />
+                <PctCell value={r.m12} />
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
