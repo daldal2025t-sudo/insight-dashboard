@@ -16,6 +16,7 @@ const INDEX_LIST = [
   { symbol: '^GSPC', label: 'S&P 500' },
   { symbol: '^NDX', label: '나스닥100' },
   { symbol: '^DJI', label: '다우지수' },
+  { symbol: 'QLD', label: 'QLD' },
   { symbol: 'VOOG', label: 'S&P500 성장' },
   { symbol: 'VOOV', label: 'S&P500 가치' },
   { symbol: '^VIX', label: '변동성지수' },
