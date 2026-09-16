@@ -62,21 +62,24 @@ async function fetchFromNaverStock(targetUrl) {
 async function fetchOverseasMarketNews(displayCount) {
   const yyyyMMdd = todayKstYyyyMMdd();
   const candidates = [
-    `https://stock.naver.com/api/foreign/news/worldNews?page=1&pageSize=${displayCount}&date=${yyyyMMdd}`,
-    `https://stock.naver.com/api/domestic/news/focus?sid=403&page=1&pageSize=${displayCount}&date=${yyyyMMdd}&enableFallback=true`,
+    { name: 'worldNews', url: `https://stock.naver.com/api/foreign/news/worldNews?page=1&pageSize=${displayCount}&date=${yyyyMMdd}` },
+    { name: 'focus(sid=403)', url: `https://stock.naver.com/api/domestic/news/focus?sid=403&page=1&pageSize=${displayCount}&date=${yyyyMMdd}&enableFallback=true` },
   ];
 
-  for (const targetUrl of candidates) {
+  // 실패 원인을 화면에 그대로 보여주기 위해 각 시도 결과를 짧은 문구로 모아둡니다.
+  const notes = [];
+
+  for (const candidate of candidates) {
     try {
-      const data = await fetchFromNaverStock(targetUrl);
+      const data = await fetchFromNaverStock(candidate.url);
       const newsList = extractNewsList(data, displayCount);
-      if (newsList.length > 0) return newsList;
-      console.error(`[해외증시] 응답은 받았지만 기사 목록이 비어 있음: ${targetUrl}`);
+      if (newsList.length > 0) return { newsList, notes };
+      notes.push(`${candidate.name}: 응답은 받았지만 기사 0건 (응답 키: ${Object.keys(data || {}).join(',') || '배열/빈값'})`);
     } catch (error) {
-      console.error(`[해외증시] 조회 실패 (${targetUrl}):`, error?.message || error);
+      notes.push(`${candidate.name}: ${error?.message || error}`);
     }
   }
-  return null; // 둘 다 실패
+  return { newsList: null, notes }; // 둘 다 실패
 }
 
 export async function GET(request) {
@@ -86,14 +89,15 @@ export async function GET(request) {
   const displayCount = Math.min(Math.max(parseInt(searchParams.get('display'), 10) || 10, 1), 20);
 
   if (query === '해외증시') {
-    const newsList = await fetchOverseasMarketNews(displayCount);
+    const { newsList, notes } = await fetchOverseasMarketNews(displayCount);
     if (newsList) {
       return NextResponse.json(newsList);
     }
     // 일반 키워드 검색으로 대체하면 "해외증시"라는 단어가 들어간 국내 기사 등 엉뚱한 결과가 섞여
     // 오히려 헷갈릴 수 있어서, 이 카테고리는 실패 시 화면에 에러를 그대로 보여줍니다.
+    // (Vercel 로그를 따로 볼 필요 없이 화면에서 바로 원인을 확인할 수 있도록 상세 내용을 함께 담습니다.)
     return NextResponse.json(
-      { error: '해외증시 뉴스를 불러오지 못했습니다. 네이버 내부 API 응답 형식이 바뀌었을 수 있어요.' },
+      { error: `해외증시 뉴스를 불러오지 못했습니다. [${notes.join(' / ')}]` },
       { status: 502 }
     );
   }
