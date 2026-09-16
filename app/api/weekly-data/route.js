@@ -159,21 +159,51 @@ async function fetchMetricsForSymbol(symbol) {
   }
 }
 
-async function fetchGroup(list) {
+// (최대) 10년 연평균 수익률(CAGR). 상장 10년 미만 종목은 실제 확보 가능한 기간만큼만 계산하고
+// cagrYears로 그 기간을 알려줍니다. (api/sector-performance와 동일한 계산 방식 - 주봉 기준)
+async function fetchCagr10y(symbol) {
+  try {
+    const now = new Date();
+    const tenYearsAgo = new Date(now);
+    tenYearsAgo.setFullYear(now.getFullYear() - 10);
+
+    const result = await yahooFinance.chart(symbol, { period1: tenYearsAgo, period2: now, interval: '1wk' });
+    const priceOf = (q) => q.adjclose ?? q.close;
+    const quotes = (result?.quotes || []).filter((q) => priceOf(q) != null && q.date);
+    if (quotes.length < 2) return null;
+
+    const first = quotes[0];
+    const last = quotes[quotes.length - 1];
+    const currentPrice = priceOf(last);
+    const oldestPrice = priceOf(first);
+    const yearsSpan = (new Date(last.date).getTime() - new Date(first.date).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+    if (!(yearsSpan > 0) || !(oldestPrice > 0)) return null;
+
+    const cagr = (Math.pow(currentPrice / oldestPrice, 1 / yearsSpan) - 1) * 100;
+    return { cagr10y: round2(cagr), cagrYears: round2(yearsSpan) };
+  } catch (error) {
+    return null;
+  }
+}
+
+async function fetchGroup(list, { includeCagr = false } = {}) {
   return Promise.all(
     list.map(async (item) => {
-      const metrics = await fetchMetricsForSymbol(item.symbol);
-      return { ...item, ...metrics };
+      const [metrics, cagr] = await Promise.all([
+        fetchMetricsForSymbol(item.symbol),
+        includeCagr ? fetchCagr10y(item.symbol) : Promise.resolve(null),
+      ]);
+      return { ...item, ...metrics, ...cagr };
     })
   );
 }
 
 async function computeWeeklyDataRaw() {
   const [indices, sectors, topCompanies, monthlyFormula] = await Promise.all([
-    fetchGroup(INDEX_LIST),
-    fetchGroup(SECTOR_LIST),
+    fetchGroup(INDEX_LIST, { includeCagr: true }),
+    fetchGroup(SECTOR_LIST, { includeCagr: true }),
     fetchGroup(TOP_COMPANY_LIST),
-    fetchGroup(MONTHLY_FORMULA_LIST),
+    fetchGroup(MONTHLY_FORMULA_LIST, { includeCagr: true }),
   ]);
   return { indices, sectors, topCompanies, monthlyFormula, updatedAt: new Date().toISOString() };
 }

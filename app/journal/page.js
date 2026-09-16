@@ -750,9 +750,9 @@ export default function JournalPage() {
 
             {weeklyData && (
               <>
-                <WeeklyDataTable title="월300 투자 공식" rows={weeklyData.monthlyFormula} priceDecimals={0} />
-                <WeeklyDataTable title="주요 지수" rows={weeklyData.indices} />
-                <WeeklyDataTable title="주요 섹터" rows={weeklyData.sectors} />
+                <WeeklyDataTable title="월300 투자 공식" rows={weeklyData.monthlyFormula} priceDecimals={0} showCagr />
+                <WeeklyDataTable title="주요 지수" rows={weeklyData.indices} showCagr />
+                <WeeklyDataTable title="주요 섹터" rows={weeklyData.sectors} showCagr />
                 <WeeklyDataTable title="S&P500 상위 기업" rows={weeklyData.topCompanies} />
               </>
             )}
@@ -764,17 +764,19 @@ export default function JournalPage() {
 }
 
 // 퍼센트 값을 색깔 있는 텍스트로 렌더링 (양수: 핑크, 음수: 파랑 - 앱 전체 색상 규칙과 동일)
-function PctCell({ value }) {
+// note가 있으면 (예: 상장 10년 미만 종목의 실제 데이터 기간) 옆에 작게 덧붙여 보여줍니다.
+function PctCell({ value, note }) {
   if (value == null) return <td className="py-2 pr-2 text-right font-black text-gray-300">-</td>;
   const cls = value >= 0 ? 'text-pink-600' : 'text-blue-500';
   return (
     <td className={`py-2 pr-2 text-right font-black ${cls}`}>
       {value > 0 ? '+' : ''}{value}%
+      {note && <span className="text-[9px] text-gray-400 font-medium ml-1">{note}</span>}
     </td>
   );
 }
 
-function WeeklyDataTable({ title, rows, priceDecimals = 2 }) {
+function WeeklyDataTable({ title, rows, priceDecimals = 2, showCagr = false }) {
   if (!rows || rows.length === 0) return null;
   return (
     <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -791,7 +793,8 @@ function WeeklyDataTable({ title, rows, priceDecimals = 2 }) {
               <th className="py-2 pr-2 text-right">1M(%)</th>
               <th className="py-2 pr-2 text-right">3M(%)</th>
               <th className="py-2 pr-2 text-right">6M(%)</th>
-              <th className="py-2 text-right">12M(%)</th>
+              <th className={`py-2 text-right ${showCagr ? 'pr-2' : ''}`}>12M(%)</th>
+              {showCagr && <th className="py-2 text-right">10년 연평균</th>}
             </tr>
           </thead>
           <tbody>
@@ -811,11 +814,22 @@ function WeeklyDataTable({ title, rows, priceDecimals = 2 }) {
                 <PctCell value={r.m3} />
                 <PctCell value={r.m6} />
                 <PctCell value={r.m12} />
+                {showCagr && (
+                  <PctCell
+                    value={r.cagr10y}
+                    note={r.cagrYears != null && r.cagrYears < 9.5 ? `(${r.cagrYears}년)` : null}
+                  />
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {showCagr && (
+        <p className="text-[10px] text-gray-400 font-medium mt-3 break-keep">
+          * 10년 연평균은 상장한 지 10년이 안 된 종목의 경우 실제 상장 이후 기간을 기준으로 계산했어요.
+        </p>
+      )}
     </div>
   );
 }
