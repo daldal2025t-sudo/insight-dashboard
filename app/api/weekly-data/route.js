@@ -178,7 +178,7 @@ async function computeWeeklyDataRaw() {
   return { indices, sectors, topCompanies, monthlyFormula, updatedAt: new Date().toISOString() };
 }
 
-const getWeeklyData = unstable_cache(computeWeeklyDataRaw, ['weekly-data-v1'], {
+const getWeeklyData = unstable_cache(computeWeeklyDataRaw, ['weekly-data-v2'], {
   tags: [CACHE_TAG],
   revalidate: FALLBACK_REVALIDATE_SECONDS,
 });

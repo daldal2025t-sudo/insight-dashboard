@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import * as cheerio from 'cheerio';
-import iconv from 'iconv-lite';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -9,52 +7,57 @@ export async function GET(request) {
   const displayCount = Math.min(Math.max(parseInt(searchParams.get('display'), 10) || 10, 1), 20);
 
   // ========================================================
-  // 🔴 1. [해외증시] 탭: 지정해주신 네이버 금융 사이트 직접 스크래핑
+  // 🔴 1. [해외증시] 탭: 네이버증권(stock.naver.com) "뉴스포커스 > 해외증시" 탭이
+  //    실제로 호출하는 비공식 내부 API를 그대로 사용합니다.
+  //    (예전에는 finance.naver.com 뉴스 목록 페이지를 직접 스크래핑했는데,
+  //     네이버가 사이트를 stock.naver.com으로 개편하면서 더는 같은 화면을 보여주지 않아 교체함)
+  //    sid=403 이 "뉴스포커스" 탭들 중 "해외증시" 섹션의 코드입니다.
+  //    ※ 문서화되지 않은 내부 API라 네이버가 예고 없이 응답 형식을 바꿀 수 있습니다.
   // ========================================================
   if (query === '해외증시') {
     try {
-      const targetUrl = 'https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=403';
+      const today = new Date();
+      const yyyyMMdd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+      const targetUrl = `https://stock.naver.com/api/domestic/news/focus?sid=403&page=1&pageSize=${displayCount}&date=${yyyyMMdd}&enableFallback=true`;
 
-      // 사람인 척 위장해서 해당 페이지의 문서를 통째로 요청합니다.
       const response = await fetch(targetUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://stock.naver.com/news/section',
+          'Accept': 'application/json, text/plain, */*',
         },
-        cache: 'no-store'
+        cache: 'no-store',
       });
 
-      // 네이버 금융의 옛날 방식(EUC-KR) 한글이 깨지지 않게 변환해 줍니다.
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const html = iconv.decode(buffer, 'EUC-KR');
+      if (response.ok) {
+        const data = await response.json();
+        // 응답이 배열로 바로 오거나, items/list 등 여러 키 중 하나에 담겨 올 수 있어 방어적으로 찾습니다.
+        const rawList = Array.isArray(data)
+          ? data
+          : data?.items || data?.list || data?.newsList || data?.articleList || data?.data || [];
 
-      // html 문서를 핀셋(cheerio)으로 조작할 수 있게 불러옵니다.
-      const $ = cheerio.load(html);
-      const newsList = [];
+        const newsList = rawList
+          .map((item) => {
+            const title = item?.title || item?.subject || item?.contentTitle || '';
+            const link =
+              item?.link ||
+              item?.url ||
+              (item?.officeId && item?.articleId
+                ? `https://n.news.naver.com/mnews/article/${item.officeId}/${item.articleId}`
+                : null) ||
+              (item?.aid ? `https://stock.naver.com/news/worldnews/${item.aid}` : null);
+            return title && link ? { title: String(title).trim(), link } : null;
+          })
+          .filter(Boolean)
+          .slice(0, displayCount);
 
-      // '.articleSubject a'는 네이버 금융 뉴스 제목에 붙어있는 고유 이름표입니다.
-      $('.articleSubject a').each((index, element) => {
-        if (index >= displayCount) return false; // 요청한 개수만큼만 뽑고 멈춥니다.
-
-        const title = $(element).attr('title') || $(element).text();
-        let link = $(element).attr('href');
-
-        // 링크가 완전한 주소가 아니면 앞부분을 붙여 완성해 줍니다.
-        if (link && link.startsWith('/')) {
-          link = 'https://finance.naver.com' + link;
+        // 뽑혔다면 화면으로 전달! (페이지에 데이터가 displayCount보다 적으면 있는 만큼만)
+        if (newsList.length > 0) {
+          return NextResponse.json(newsList);
         }
-
-        if (title && link) {
-          newsList.push({ title: title.trim(), link });
-        }
-      });
-
-      // 뽑혔다면 화면으로 전달! (페이지에 데이터가 displayCount보다 적으면 있는 만큼만)
-      if (newsList.length > 0) {
-        return NextResponse.json(newsList);
       }
     } catch (error) {
-      console.error('스크래핑 에러:', error);
+      console.error('네이버증권 해외증시 포커스 뉴스 조회 에러:', error);
       // 만약 에러가 나면 아래의 네이버 API 일반 검색으로 자동으로 넘어갑니다.
     }
   }
