@@ -1,69 +1,105 @@
 import { NextResponse } from 'next/server';
 
+// 오늘 날짜를 한국 시간(KST, UTC+9) 기준 'yyyyMMdd'로 계산합니다.
+// (Vercel 서버는 UTC로 동작하기 때문에 그냥 new Date()를 쓰면 자정 근처에 날짜가 하루 어긋날 수 있습니다.)
+function todayKstYyyyMMdd() {
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return `${kst.getUTCFullYear()}${String(kst.getUTCMonth() + 1).padStart(2, '0')}${String(kst.getUTCDate()).padStart(2, '0')}`;
+}
+
+// 네이버증권(stock.naver.com) 내부 API 응답에서 기사 목록을 최대한 유연하게 뽑아냅니다.
+// (문서화되지 않은 API라 정확한 필드명을 100% 장담할 수 없어 여러 형태를 방어적으로 시도합니다.)
+function extractNewsList(data, displayCount) {
+  const rawList = Array.isArray(data)
+    ? data
+    : data?.items || data?.list || data?.newsList || data?.articleList || data?.data || [];
+
+  if (!Array.isArray(rawList)) return [];
+
+  return rawList
+    .map((item) => {
+      const title = item?.title || item?.subject || item?.contentTitle || '';
+      const link =
+        item?.link ||
+        item?.url ||
+        (item?.officeId && item?.articleId
+          ? `https://n.news.naver.com/mnews/article/${item.officeId}/${item.articleId}`
+          : null) ||
+        (item?.aid ? `https://stock.naver.com/news/worldnews/${item.aid}` : null);
+      return title && link ? { title: String(title).replace(/<[^>]*>/g, '').trim(), link } : null;
+    })
+    .filter(Boolean)
+    .slice(0, displayCount);
+}
+
+async function fetchFromNaverStock(targetUrl) {
+  const response = await fetch(targetUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
+      'Referer': 'https://stock.naver.com/news/section',
+      'Accept': 'application/json, text/plain, */*',
+    },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const bodyPreview = await response.text().catch(() => '');
+    throw new Error(`HTTP ${response.status} — ${bodyPreview.slice(0, 200)}`);
+  }
+  return response.json();
+}
+
+// ========================================================
+// 🔴 [해외증시] 탭: 네이버증권(stock.naver.com)의 "뉴스포커스 > 해외증시" 탭이
+//    실제로 호출하는 비공식 내부 API를 그대로 사용합니다.
+//    (예전에는 finance.naver.com 뉴스 목록 페이지를 직접 스크래핑했는데,
+//     네이버가 사이트를 stock.naver.com으로 개편하면서 더는 같은 화면을 보여주지 않아 교체함)
+//    두 후보를 순서대로 시도합니다:
+//      1) /api/foreign/news/worldNews — "해외뉴스"(로이터 등 해외 시황) 목록
+//      2) /api/domestic/news/focus?sid=403 — "뉴스포커스" 탭들 중 "해외증시" 섹션(보조용, 가끔 결과가 비어있음)
+//    ※ 둘 다 문서화되지 않은 내부 API라 네이버가 예고 없이 응답 형식을 바꿀 수 있습니다.
+// ========================================================
+async function fetchOverseasMarketNews(displayCount) {
+  const yyyyMMdd = todayKstYyyyMMdd();
+  const candidates = [
+    `https://stock.naver.com/api/foreign/news/worldNews?page=1&pageSize=${displayCount}&date=${yyyyMMdd}`,
+    `https://stock.naver.com/api/domestic/news/focus?sid=403&page=1&pageSize=${displayCount}&date=${yyyyMMdd}&enableFallback=true`,
+  ];
+
+  for (const targetUrl of candidates) {
+    try {
+      const data = await fetchFromNaverStock(targetUrl);
+      const newsList = extractNewsList(data, displayCount);
+      if (newsList.length > 0) return newsList;
+      console.error(`[해외증시] 응답은 받았지만 기사 목록이 비어 있음: ${targetUrl}`);
+    } catch (error) {
+      console.error(`[해외증시] 조회 실패 (${targetUrl}):`, error?.message || error);
+    }
+  }
+  return null; // 둘 다 실패
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   let query = searchParams.get('query') || '경제';
   // '더보기' 지원: 요청한 개수만큼(기본 10개, 최대 20개) 가져옵니다.
   const displayCount = Math.min(Math.max(parseInt(searchParams.get('display'), 10) || 10, 1), 20);
 
-  // ========================================================
-  // 🔴 1. [해외증시] 탭: 네이버증권(stock.naver.com) "뉴스포커스 > 해외증시" 탭이
-  //    실제로 호출하는 비공식 내부 API를 그대로 사용합니다.
-  //    (예전에는 finance.naver.com 뉴스 목록 페이지를 직접 스크래핑했는데,
-  //     네이버가 사이트를 stock.naver.com으로 개편하면서 더는 같은 화면을 보여주지 않아 교체함)
-  //    sid=403 이 "뉴스포커스" 탭들 중 "해외증시" 섹션의 코드입니다.
-  //    ※ 문서화되지 않은 내부 API라 네이버가 예고 없이 응답 형식을 바꿀 수 있습니다.
-  // ========================================================
   if (query === '해외증시') {
-    try {
-      const today = new Date();
-      const yyyyMMdd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-      const targetUrl = `https://stock.naver.com/api/domestic/news/focus?sid=403&page=1&pageSize=${displayCount}&date=${yyyyMMdd}&enableFallback=true`;
-
-      const response = await fetch(targetUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
-          'Referer': 'https://stock.naver.com/news/section',
-          'Accept': 'application/json, text/plain, */*',
-        },
-        cache: 'no-store',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // 응답이 배열로 바로 오거나, items/list 등 여러 키 중 하나에 담겨 올 수 있어 방어적으로 찾습니다.
-        const rawList = Array.isArray(data)
-          ? data
-          : data?.items || data?.list || data?.newsList || data?.articleList || data?.data || [];
-
-        const newsList = rawList
-          .map((item) => {
-            const title = item?.title || item?.subject || item?.contentTitle || '';
-            const link =
-              item?.link ||
-              item?.url ||
-              (item?.officeId && item?.articleId
-                ? `https://n.news.naver.com/mnews/article/${item.officeId}/${item.articleId}`
-                : null) ||
-              (item?.aid ? `https://stock.naver.com/news/worldnews/${item.aid}` : null);
-            return title && link ? { title: String(title).trim(), link } : null;
-          })
-          .filter(Boolean)
-          .slice(0, displayCount);
-
-        // 뽑혔다면 화면으로 전달! (페이지에 데이터가 displayCount보다 적으면 있는 만큼만)
-        if (newsList.length > 0) {
-          return NextResponse.json(newsList);
-        }
-      }
-    } catch (error) {
-      console.error('네이버증권 해외증시 포커스 뉴스 조회 에러:', error);
-      // 만약 에러가 나면 아래의 네이버 API 일반 검색으로 자동으로 넘어갑니다.
+    const newsList = await fetchOverseasMarketNews(displayCount);
+    if (newsList) {
+      return NextResponse.json(newsList);
     }
+    // 일반 키워드 검색으로 대체하면 "해외증시"라는 단어가 들어간 국내 기사 등 엉뚱한 결과가 섞여
+    // 오히려 헷갈릴 수 있어서, 이 카테고리는 실패 시 화면에 에러를 그대로 보여줍니다.
+    return NextResponse.json(
+      { error: '해외증시 뉴스를 불러오지 못했습니다. 네이버 내부 API 응답 형식이 바뀌었을 수 있어요.' },
+      { status: 502 }
+    );
   }
 
   // ========================================================
-  // 2. 그 외 일반 카테고리는 기존 네이버 검색 API 유지
+  // 그 외 일반 카테고리는 기존 네이버 검색 API 유지
   // ========================================================
   // 네이버 API 키는 .env.local 에서 불러옵니다 (코드에 직접 넣지 마세요).
   const clientId = process.env.NAVER_CLIENT_ID;
@@ -90,7 +126,7 @@ export async function GET(request) {
 
     const data = await response.json();
     return NextResponse.json(data.items);
-    
+
   } catch (error) {
     return NextResponse.json({ error: '데이터를 불러오는 데 실패했습니다.' }, { status: 500 });
   }
