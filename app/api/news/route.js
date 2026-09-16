@@ -7,21 +7,27 @@ function todayKstYyyyMMdd() {
   return `${kst.getUTCFullYear()}${String(kst.getUTCMonth() + 1).padStart(2, '0')}${String(kst.getUTCDate()).padStart(2, '0')}`;
 }
 
-// 네이버증권(stock.naver.com) 내부 API 응답에서 기사 목록을 최대한 유연하게 뽑아냅니다.
+// 네이버증권(stock.naver.com) 내부 API 응답에서 실제 기사 배열이 담긴 위치를 찾습니다.
 // (문서화되지 않은 API라 정확한 필드명을 100% 장담할 수 없어 여러 형태를 방어적으로 시도합니다.)
-function extractNewsList(data, displayCount) {
-  const rawList = Array.isArray(data)
-    ? data
-    : data?.items || data?.list || data?.newsList || data?.articleList || data?.data || [];
+function pickRawList(data) {
+  if (Array.isArray(data)) return data;
+  const candidate =
+    data?.items || data?.list || data?.newsList || data?.articleList || data?.articles || data?.data;
+  return Array.isArray(candidate) ? candidate : [];
+}
 
-  if (!Array.isArray(rawList)) return [];
-
+// 기사 배열의 각 항목에서 제목/링크를 최대한 유연하게 뽑아냅니다.
+function extractNewsList(rawList, displayCount) {
   return rawList
     .map((item) => {
-      const title = item?.title || item?.subject || item?.contentTitle || '';
+      const title = item?.title || item?.subject || item?.contentTitle || item?.newsTitle || '';
       const link =
         item?.link ||
         item?.url ||
+        item?.linkUrl ||
+        item?.newsUrl ||
+        item?.pcUrl ||
+        item?.mobileUrl ||
         (item?.officeId && item?.articleId
           ? `https://n.news.naver.com/mnews/article/${item.officeId}/${item.articleId}`
           : null) ||
@@ -72,9 +78,13 @@ async function fetchOverseasMarketNews(displayCount) {
   for (const candidate of candidates) {
     try {
       const data = await fetchFromNaverStock(candidate.url);
-      const newsList = extractNewsList(data, displayCount);
+      const rawList = pickRawList(data);
+      const newsList = extractNewsList(rawList, displayCount);
       if (newsList.length > 0) return { newsList, notes };
-      notes.push(`${candidate.name}: 응답은 받았지만 기사 0건 (응답 키: ${Object.keys(data || {}).join(',') || '배열/빈값'})`);
+      // 화면에서 바로 원인을 알 수 있도록 최상위 키와, 기사 항목이 있다면 그 항목의 키까지 함께 보여줍니다.
+      const topKeys = Object.keys(data || {}).join(',') || '(배열/빈값)';
+      const itemKeys = rawList[0] ? Object.keys(rawList[0]).join(',') : '(항목 없음)';
+      notes.push(`${candidate.name}: 기사 0건 (최상위 키: ${topKeys} / 항목 키: ${itemKeys})`);
     } catch (error) {
       notes.push(`${candidate.name}: ${error?.message || error}`);
     }
