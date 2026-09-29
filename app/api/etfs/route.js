@@ -55,7 +55,88 @@ const fetchLiveSectors = unstable_cache(
   { revalidate: SECTOR_CACHE_SECONDS }
 );
 
-export async function GET() {
+// ==========================================================
+// 🆕 사용자가 검색 목록에 없는 티커를 "직접 추가"했을 때 쓰는 로직.
+// 고정된 masterPool과 달리 이름/배당수익률/기간별 수익률(CAGR)을 전부 야후에서 실시간으로 계산한다.
+// 사이즈/스타일(대형·가치 등) 박스는 무료로 안정적으로 가져올 API가 없어 항상 비워둔다 - 이러면
+// 아래 archive/page.js의 가중합 계산에서 이 항목은 자연히 사이즈/스타일 차트에서만 제외되고
+// (섹터·배당·수익률·평가금액에는 그대로 반영됨) 기존 채권/금 ETF(TLT, GLD 등)와 동일한 방식으로 처리된다.
+// ==========================================================
+
+// 국내 6자리(신형은 숫자+영문 조합) 종목코드처럼 보이면 야후용 접미사(.KS)를 붙여준다.
+function normalizeExtraSymbol(raw) {
+  const trimmed = raw.trim().toUpperCase();
+  if (/^[0-9A-Z]{6}$/.test(trimmed) && /\d/.test(trimmed)) {
+    return `${trimmed}.KS`;
+  }
+  return trimmed;
+}
+
+// symbol 하나의 이름 / 배당수익률 / 1y·3y·5y·10y 연평균 수익률(CAGR)을 야후에서 계산.
+const fetchExtraMetricsRaw = async (symbol) => {
+  try {
+    const now = new Date();
+    const tenYearsAgo = new Date(now);
+    tenYearsAgo.setFullYear(now.getFullYear() - 10);
+
+    const [quoteSummaryResult, chartResult] = await Promise.all([
+      yahooFinance.quoteSummary(symbol, { modules: ['price', 'summaryDetail'] }).catch(() => null),
+      yahooFinance.chart(symbol, { period1: tenYearsAgo, period2: now, interval: '1wk' }).catch(() => null),
+    ]);
+
+    const name = quoteSummaryResult?.price?.longName || quoteSummaryResult?.price?.shortName || null;
+    const divYieldRaw = quoteSummaryResult?.summaryDetail?.dividendYield ?? quoteSummaryResult?.summaryDetail?.trailingAnnualDividendYield;
+    const div = typeof divYieldRaw === 'number' ? Math.round(divYieldRaw * 1000) / 10 : 0; // 0.013 -> 1.3(%)
+
+    const priceOf = (q) => q.adjclose ?? q.close;
+    const quotes = (chartResult?.quotes || []).filter((q) => priceOf(q) != null && q.date);
+    const cagr = {};
+    if (quotes.length >= 2) {
+      const last = quotes[quotes.length - 1];
+      const lastDate = new Date(last.date);
+      const currentPrice = priceOf(last);
+
+      for (const [key, years] of [['1y', 1], ['3y', 3], ['5y', 5], ['10y', 10]]) {
+        const target = new Date(lastDate);
+        target.setFullYear(target.getFullYear() - years);
+        let closest = null;
+        let minDiff = Infinity;
+        for (const q of quotes) {
+          const diff = Math.abs(new Date(q.date).getTime() - target.getTime());
+          if (diff < minDiff) { minDiff = diff; closest = q; }
+        }
+        if (closest) {
+          const oldPrice = priceOf(closest);
+          const actualYears = (lastDate.getTime() - new Date(closest.date).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+          if (oldPrice > 0 && actualYears > 0.5) {
+            cagr[key] = Math.round((Math.pow(currentPrice / oldPrice, 1 / actualYears) - 1) * 1000) / 10;
+          }
+        }
+      }
+    }
+    return { name, div, cagr };
+  } catch (e) {
+    return null;
+  }
+};
+
+// symbol별로 7일간 캐싱 (배당수익률/CAGR은 자주 바뀌는 데이터가 아님)
+const fetchExtraMetrics = unstable_cache(
+  fetchExtraMetricsRaw,
+  ['etf-extra-metrics'],
+  { revalidate: SECTOR_CACHE_SECONDS }
+);
+
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  // 사용자가 직접 추가한 티커 목록 (localStorage에 저장돼 있다가 페이지 로드시 여기로 전달됨)
+  const extraSymbols = [...new Set(
+    (searchParams.get('extra') || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => /^[0-9A-Za-z.\-^]{1,15}$/.test(s))
+  )].slice(0, 30); // 남용 방지용 최대 개수 제한
+
   const masterPool = {
     // ==========================================
     // 🇰🇷 기존 유지: 국내 상장 ETF
@@ -212,14 +293,40 @@ export async function GET() {
     return { name: item.name, code: item.code, symbol: item.symbol, value: '-', change: '0.00%', changeAmt: '0', isUp: null, xray: item.xray };
   };
 
+  // 사용자가 직접 추가한 임의 티커 하나를 가격/섹터/배당/CAGR까지 채워서 masterPool 항목과 같은 모양으로 만든다.
+  const fetchExtraItem = async (rawSymbol) => {
+    const symbol = normalizeExtraSymbol(rawSymbol);
+    const [priceInfo, liveSectors, extraMetrics] = await Promise.all([
+      fetchYahooPrice({ name: rawSymbol, code: rawSymbol, symbol, xray: null }),
+      fetchLiveSectors(symbol),
+      fetchExtraMetrics(symbol),
+    ]);
+
+    return {
+      ...priceInfo,
+      code: rawSymbol,
+      name: extraMetrics?.name || priceInfo.name || rawSymbol,
+      xray: {
+        sectors: liveSectors || {},
+        sizes: {},
+        styles: {},
+        div: extraMetrics?.div ?? 0,
+        cagr: extraMetrics?.cagr ?? {},
+        sectorsSource: liveSectors ? 'live' : 'none',
+        isCustom: true,
+      },
+    };
+  };
+
   try {
     const poolItems = Object.entries(masterPool).map(([code, config]) => ({
       code, name: config.name, symbol: config.symbol, xray: config
     }));
 
-    const [fetchedPool, liveSectorsList] = await Promise.all([
+    const [fetchedPool, liveSectorsList, extraPool] = await Promise.all([
       Promise.all(poolItems.map(fetchYahooPrice)),
       Promise.all(poolItems.map((item) => fetchLiveSectors(item.symbol))),
+      Promise.all(extraSymbols.map(fetchExtraItem)),
     ]);
 
     const mergedPool = fetchedPool.map((item, idx) => {
@@ -230,7 +337,7 @@ export async function GET() {
       return item.xray ? { ...item, xray: { ...item.xray, sectorsSource: 'fallback' } } : item;
     });
 
-    return NextResponse.json({ pool: mergedPool });
+    return NextResponse.json({ pool: [...mergedPool, ...extraPool] });
   } catch (error) {
     return NextResponse.json({ error: 'ETF 마스터 풀 동기화 실패' }, { status: 500 });
   }

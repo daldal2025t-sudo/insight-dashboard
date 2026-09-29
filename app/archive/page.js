@@ -25,10 +25,27 @@ export default function ArchivePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+  // 🆕 검색 목록(masterPool)에 없는 티커를 사용자가 직접 추가한 목록. 기기(브라우저)에만 저장됨.
+  const [customTickers, setCustomTickers] = useState([]);
+  const [isAddingCustomTicker, setIsAddingCustomTicker] = useState(false);
+  const [customTickerError, setCustomTickerError] = useState(null);
+
   // 📊 리밸런싱 탭: 섹터별 ETF 수익률 (7일 캐싱, 탭을 열 때만 조회)
   const [sectorPerf, setSectorPerf] = useState(null);
   const [sectorPerfLoading, setSectorPerfLoading] = useState(false);
   const [sectorPerfError, setSectorPerfError] = useState(null);
+
+  // extraList: 사용자가 직접 추가한 티커 배열. masterPool 전체를 다시 받아오면서
+  // 이 티커들의 실시간 가격/섹터/배당/수익률도 함께 채워서 내려받는다.
+  const fetchMasterPool = (extraList) => {
+    const extraParam = (extraList || []).join(',');
+    return fetch(`/api/etfs${extraParam ? `?extra=${encodeURIComponent(extraParam)}` : ''}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!data.error) setMasterPool(data.pool || []);
+        return data;
+      });
+  };
 
   useEffect(() => {
     const savedTabLists = localStorage.getItem('kijay_tab_configurations');
@@ -44,10 +61,13 @@ export default function ArchivePage() {
     const savedQuantities = localStorage.getItem('kijay_etf_counts_v2');
     if (savedQuantities) { try { setQuantities(JSON.parse(savedQuantities)); } catch (e) {} }
 
-    fetch('/api/etfs')
-      .then(res => res.json())
-      .then(data => { if (!data.error) setMasterPool(data.pool || []); setIsLoading(false); })
-      .catch(err => console.error(err));
+    let initialCustomTickers = [];
+    const savedCustomTickers = localStorage.getItem('kijay_custom_etfs');
+    if (savedCustomTickers) {
+      try { initialCustomTickers = JSON.parse(savedCustomTickers); setCustomTickers(initialCustomTickers); } catch (e) {}
+    }
+
+    fetchMasterPool(initialCustomTickers).finally(() => setIsLoading(false));
 
     fetch('/api/stocks')
       .then(res => res.json())
@@ -111,6 +131,35 @@ export default function ArchivePage() {
     localStorage.setItem('kijay_tab_configurations', JSON.stringify(nextState));
     setSearchQuery('');
     setIsDropdownOpen(false);
+  };
+
+  // 검색 목록에 없는 티커를 사용자가 직접 입력해서 추가. 가격/섹터/배당/CAGR을 실시간으로 조회해서
+  // masterPool에 합쳐 넣고, 지금 보고 있는 탭(또는 편집 중인 모델 포트폴리오)에 바로 편입한다.
+  const handleAddCustomTicker = () => {
+    const raw = searchQuery.trim().toUpperCase();
+    if (!raw) return;
+    if (!/^[0-9A-Z.\-^]{1,15}$/.test(raw)) {
+      setCustomTickerError('영문/숫자 티커만 입력할 수 있어요 (예: AAPL, 005930)');
+      return;
+    }
+    setCustomTickerError(null);
+    setIsAddingCustomTicker(true);
+
+    const nextCustomTickers = customTickers.includes(raw) ? customTickers : [...customTickers, raw];
+    setCustomTickers(nextCustomTickers);
+    localStorage.setItem('kijay_custom_etfs', JSON.stringify(nextCustomTickers));
+
+    fetchMasterPool(nextCustomTickers)
+      .then(() => {
+        handleAddStockToTab(raw);
+        setSearchQuery('');
+        setIsDropdownOpen(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setCustomTickerError('종목 정보를 불러오지 못했어요. 티커를 다시 확인해 주세요.');
+      })
+      .finally(() => setIsAddingCustomTicker(false));
   };
 
   const handleAddStockToMyAssets = (code) => {
@@ -490,15 +539,15 @@ export default function ArchivePage() {
                 <label className="block text-xs font-black text-gray-500 mb-1.5 tracking-wider">🔍 내 자산에 종목 담기 (미국/국내 ETF 검색)</label>
               )}
               
-              <input 
+              <input
                 type="text"
                 placeholder="예: 반도체, ACE, S&P500, QQQ..."
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setIsDropdownOpen(e.target.value !== ''); }}
+                onChange={(e) => { setSearchQuery(e.target.value); setIsDropdownOpen(e.target.value !== ''); setCustomTickerError(null); }}
                 onFocus={() => { if(searchQuery !== '') setIsDropdownOpen(true); }}
                 className="w-full border border-gray-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-black font-semibold transition"
               />
-              {isDropdownOpen && filteredSearchPool.length > 0 && (
+              {isDropdownOpen && (filteredSearchPool.length > 0 || searchQuery.trim() !== '') && (
                 <ul className="absolute left-4 right-4 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 p-1 flex flex-col gap-0.5">
                   {filteredSearchPool.map((item, idx) => (
                     <li key={idx} onClick={() => handleAddStockToTab(item.code)} className="p-3 hover:bg-slate-50 rounded-lg cursor-pointer flex justify-between items-center transition">
@@ -506,8 +555,21 @@ export default function ArchivePage() {
                       <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md hover:bg-blue-100">+ 편입</span>
                     </li>
                   ))}
+                  {searchQuery.trim() !== '' && !filteredSearchPool.some(item => item.code.toUpperCase() === searchQuery.trim().toUpperCase()) && (
+                    <li
+                      onClick={() => { if (!isAddingCustomTicker) handleAddCustomTicker(); }}
+                      className={`p-3 rounded-lg flex justify-between items-center transition border-t border-gray-100 mt-0.5 pt-3 ${isAddingCustomTicker ? 'opacity-60' : 'hover:bg-indigo-50 cursor-pointer'}`}
+                    >
+                      <div>
+                        <span className="font-bold text-gray-900 text-sm">&quot;{searchQuery.trim().toUpperCase()}&quot; 티커로 직접 추가</span>
+                        <p className="text-[10px] text-gray-400 mt-0.5">목록에 없는 미국/국내 ETF도 실시간 가격·섹터·배당 정보를 가져와 추가할 수 있어요 (사이즈·스타일 정보는 제공되지 않아요)</p>
+                      </div>
+                      <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md hover:bg-indigo-100 shrink-0 ml-2">{isAddingCustomTicker ? '⏳' : '+ 추가'}</span>
+                    </li>
+                  )}
                 </ul>
               )}
+              {customTickerError && <p className="text-xs font-bold text-red-500 mt-1.5">{customTickerError}</p>}
             </div>
           )}
 
