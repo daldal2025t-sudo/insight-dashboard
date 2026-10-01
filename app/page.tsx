@@ -85,6 +85,77 @@ function NewsCard({ category }) {
   );
 }
 
+// 화면 상단 검정색 "바로가기" 바. 해외주식 기사 사이트는 중요도가 낮은 3개를 "더보기"로 접어둔다.
+function QuickLinksSection() {
+  const [showMore, setShowMore] = useState(false);
+
+  return (
+    <section className="bg-black text-white rounded-2xl p-6 shadow-lg mb-12">
+      <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+        <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+          <span className="text-red-400 font-bold text-xs bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">Global</span>
+          <a href="https://www.hankyung.com/globalmarket/1123" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 글로벌마켓</a>
+        </li>
+        <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+          <span className="text-blue-400 font-bold text-xs bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900 min-w-[56px] text-center">Korea</span>
+          <a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 코리안마켓</a>
+        </li>
+        <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+          <span className="text-pink-400 font-bold text-xs bg-pink-950/50 px-2 py-0.5 rounded border border-pink-900 min-w-[56px] text-center">Index</span>
+          <a href="https://www.indexergo.com/index?group=usa" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Indexergo Map</a>
+        </li>
+        <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+          <span className="text-purple-400 font-bold text-xs bg-purple-950/50 px-2 py-0.5 rounded border border-purple-900 min-w-[56px] text-center">StockA</span>
+          <a href="https://stockanalysis.com/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">StockAnalysis</a>
+        </li>
+        <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+          <span className="text-amber-400 font-bold text-xs bg-amber-950/50 px-2 py-0.5 rounded border border-amber-900 min-w-[56px] text-center">Cycle</span>
+          <a href="https://institutional.fidelity.com/app/item/RD_13569_40890.html" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">경기사이클</a>
+        </li>
+        <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+          <span className="text-emerald-400 font-bold text-xs bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900 min-w-[56px] text-center">FED</span>
+          <a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">FED 점도표</a>
+        </li>
+
+        {/* 🆕 해외주식 기사 사이트: 중요도 높은 2개는 항상 노출 */}
+        <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+          <span className="text-cyan-400 font-bold text-xs bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-900 min-w-[56px] text-center">FN</span>
+          <a href="https://www.fnnews.com/section/001002000" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">파이낸셜뉴스 국제경제</a>
+        </li>
+        <li className={`flex gap-4 items-center ${showMore ? 'border-b border-gray-900 pb-3' : ''}`}>
+          <span className="text-rose-400 font-bold text-xs bg-rose-950/50 px-2 py-0.5 rounded border border-rose-900 min-w-[56px] text-center">MT</span>
+          <a href="https://www.mt.co.kr/world" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">머니투데이 월드</a>
+        </li>
+
+        {/* 🆕 중요도 낮은 3개: "더보기"를 눌러야 보임 */}
+        {showMore && (
+          <>
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+              <span className="text-orange-400 font-bold text-xs bg-orange-950/50 px-2 py-0.5 rounded border border-orange-900 min-w-[56px] text-center">Chosun</span>
+              <a href="https://biz.chosun.com/international" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">조선비즈 인터내셔널</a>
+            </li>
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+              <span className="text-teal-400 font-bold text-xs bg-teal-950/50 px-2 py-0.5 rounded border border-teal-900 min-w-[56px] text-center">Sedaily</span>
+              <a href="https://www.sedaily.com/world" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">서울경제 월드</a>
+            </li>
+            <li className="flex gap-4 items-center">
+              <span className="text-lime-400 font-bold text-xs bg-lime-950/50 px-2 py-0.5 rounded border border-lime-900 min-w-[56px] text-center">GEnews</span>
+              <a href="https://www.g-enews.com/list.php?ct=g080200" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">글로벌이코노믹</a>
+            </li>
+          </>
+        )}
+      </ul>
+
+      <button
+        onClick={() => setShowMore((prev) => !prev)}
+        className="mt-4 text-xs font-bold text-gray-400 hover:text-white transition"
+      >
+        {showMore ? '해외주식 기사 사이트 접기 ▴' : '해외주식 기사 사이트 더보기 (+3) ▾'}
+      </button>
+    </section>
+  );
+}
+
 function StockTicker() {
   const [liveData, setLiveData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -207,35 +278,8 @@ export default function Home() {
       
       <main className="max-w-7xl mx-auto">
         <StockTicker />
-        <section className="bg-black text-white rounded-2xl p-6 shadow-lg mb-12">
-          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
-              <span className="text-red-400 font-bold text-xs bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">Global</span>
-              <a href="https://www.hankyung.com/globalmarket/1123" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 글로벌마켓</a>
-            </li>
-            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
-              <span className="text-blue-400 font-bold text-xs bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900 min-w-[56px] text-center">Korea</span>
-              <a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 코리안마켓</a>
-            </li>
-            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
-              <span className="text-pink-400 font-bold text-xs bg-pink-950/50 px-2 py-0.5 rounded border border-pink-900 min-w-[56px] text-center">Index</span>
-              <a href="https://www.indexergo.com/index?group=usa" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">Indexergo Map</a>
-            </li>
-            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
-              <span className="text-purple-400 font-bold text-xs bg-purple-950/50 px-2 py-0.5 rounded border border-purple-900 min-w-[56px] text-center">StockA</span>
-              <a href="https://stockanalysis.com/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">StockAnalysis</a>
-            </li>
-            <li className="flex gap-4 items-center border-b lg:border-b-0 border-gray-900 pb-3 lg:pb-0">
-              <span className="text-amber-400 font-bold text-xs bg-amber-950/50 px-2 py-0.5 rounded border border-amber-900 min-w-[56px] text-center">Cycle</span>
-              <a href="https://institutional.fidelity.com/app/item/RD_13569_40890.html" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">경기사이클</a>
-            </li>
-            <li className="flex gap-4 items-center pt-2">
-              <span className="text-emerald-400 font-bold text-xs bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900 min-w-[56px] text-center">FED</span>
-              <a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">FED 점도표</a>
-            </li>
-          </ul>
-        </section>
-        
+        <QuickLinksSection />
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <NewsCard category="해외증시" />
           <NewsCard category="경제" />
