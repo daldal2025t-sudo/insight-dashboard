@@ -3,6 +3,31 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
+// 섹터 ETF 티커 → 앱 내부 섹터 키
+const SECTOR_ETF_KEY = {
+  XLK: 'tech', XLF: 'finance', XLV: 'health', XLY: 'consumer_cyc', XLP: 'consumer_def',
+  XLI: 'ind', XLE: 'energy', XLU: 'utilities', XLB: 'basic', XLRE: 'realestate', XLC: 'communication',
+};
+
+// 경기 국면별 섹터 연평균 수익률(%) — 월급쟁이부자들 교안(미국 주식 중급반 1주차) 표 기준 정적 값.
+// early=회복기, mid=확장기, late=둔화기, recession=침체기. 통신(XLC)은 교안 표에 없어 경기 점수에서 제외.
+const SECTOR_CYCLE_RETURNS = {
+  tech:         { early: 28.4, mid: 21.0, late: 10.1, recession: -20.3 },
+  finance:      { early: 23.1, mid: 18.7, late: 13.7, recession: -13.3 },
+  realestate:   { early: 39.2, mid: 17.8, late: 2.4,  recession: -21.6 },
+  consumer_cyc: { early: 33.1, mid: 16.6, late: 5.5,  recession: -12.0 },
+  ind:          { early: 27.4, mid: 16.2, late: 11.9, recession: -14.8 },
+  energy:       { early: 27.1, mid: 15.5, late: 8.5,  recession: -3.5 },
+  basic:        { early: 29.3, mid: 13.1, late: 6.5,  recession: -11.5 },
+  health:       { early: 21.4, mid: 10.8, late: 15.0, recession: -2.9 },
+  consumer_def: { early: 18.0, mid: 10.6, late: 14.6, recession: 1.0 },
+  utilities:    { early: 14.7, mid: 7.6,  late: 11.8, recession: -1.6 },
+};
+// 경기 국면 점수의 상위/하위 3개를 고를 때 제외하는 섹터 (부동산, 에너지)
+const CYCLE_RANK_EXCLUDED = ['realestate', 'energy'];
+// 섹터의 (1년 − 장기 연평균) 이 S&P500 의 같은 값보다 이만큼(%p) 이상 크면 과열(-1), 작으면 과매도(+1)
+const GAP_THRESHOLD = 5;
+
 export default function ArchivePage() {
   const [activeTab, setActiveTab] = useState('myassets');
   const [masterPool, setMasterPool] = useState([]);
@@ -34,6 +59,7 @@ export default function ArchivePage() {
   const [sectorPerf, setSectorPerf] = useState(null);
   const [sectorPerfLoading, setSectorPerfLoading] = useState(false);
   const [sectorPerfError, setSectorPerfError] = useState(null);
+  const [sectorBenchmark, setSectorBenchmark] = useState(null);
 
   // extraList: 사용자가 직접 추가한 티커 배열. masterPool 전체를 다시 받아오면서
   // 이 티커들의 실시간 가격/섹터/배당/수익률도 함께 채워서 내려받는다.
@@ -93,6 +119,7 @@ export default function ArchivePage() {
       .then(data => {
         if (Array.isArray(data?.sectors)) {
           setSectorPerf(data.sectors);
+          setSectorBenchmark(data.benchmark || null);
         } else {
           setSectorPerfError((data && data.error) || '알 수 없는 형식의 응답을 받았습니다.');
         }
@@ -325,6 +352,39 @@ export default function ArchivePage() {
     }
   };
   const currentCycleData = cycleDefinitions[cyclePhase];
+
+  // 🧮 섹터 확대/축소 점수 = 장단기 성과차 점수(-1/0/+1) + 경기 국면 점수(유리 3개 +1, 불리 3개 -1)
+  let sectorScoreRows = null;
+  if (sectorPerf && sectorBenchmark && sectorBenchmark.oneYearReturn != null && sectorBenchmark.longTermCagr != null) {
+    const benchGap = sectorBenchmark.oneYearReturn - sectorBenchmark.longTermCagr;
+    const rows = sectorPerf.map((s) => {
+      const key = SECTOR_ETF_KEY[s.symbol];
+      const gap = s.oneYearReturn != null && s.longTermCagr != null ? s.oneYearReturn - s.longTermCagr : null;
+      const rel = gap != null ? gap - benchGap : null;
+      const gapScore = rel == null ? 0 : rel >= GAP_THRESHOLD ? -1 : rel <= -GAP_THRESHOLD ? 1 : 0;
+      const cycleReturn = SECTOR_CYCLE_RETURNS[key]?.[cyclePhase] ?? null;
+      return { symbol: s.symbol, label: s.label, key, rel, gapScore, cycleReturn, cycleScore: 0 };
+    });
+    const ranked = rows.filter(r => r.cycleReturn != null && !CYCLE_RANK_EXCLUDED.includes(r.key)).sort((a, b) => b.cycleReturn - a.cycleReturn);
+    ranked.slice(0, 3).forEach(r => { r.cycleScore = 1; });
+    ranked.slice(-3).forEach(r => { r.cycleScore = -1; });
+    rows.forEach(r => { r.total = r.gapScore + r.cycleScore; });
+    sectorScoreRows = rows.sort((a, b) => b.total - a.total);
+  }
+  const overweightKeys = sectorScoreRows ? sectorScoreRows.filter(r => r.total > 0).map(r => r.key) : [];
+  const underweightKeys = sectorScoreRows ? sectorScoreRows.filter(r => r.total < 0).map(r => r.key) : [];
+  const sumSectors = (sectors, keys) => keys.reduce((acc, k) => acc + (sectors?.[k] || 0), 0);
+  // 내가 보유한 ETF 별 (확대 섹터 비중 합 − 축소 섹터 비중 합). 클수록 늘릴 후보, 작을수록 줄일 후보.
+  const etfExpandShrinkRows = sectorScoreRows
+    ? finalMappedItems
+        .filter(i => i.evalValue > 0 && i.xray && i.xray.sectors && Object.keys(i.xray.sectors).length > 0)
+        .map(i => {
+          const over = sumSectors(i.xray.sectors, overweightKeys);
+          const under = sumSectors(i.xray.sectors, underweightKeys);
+          return { code: i.code, name: i.name, over, under, diff: over - under };
+        })
+        .sort((a, b) => b.diff - a.diff)
+    : [];
 
   const sectorsFinal = [
     { label: '정보기술 (Tech)', val: pTech }, { label: '금융서비스 (Finance)', val: pFin }, { label: '헬스케어 (Health)', val: pHealth }, { label: '산업재 (Industrials)', val: pInd },
@@ -631,6 +691,83 @@ export default function ArchivePage() {
                   </div>
                 )}
               </div>
+
+              {sectorScoreRows && (
+                <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
+                  <h3 className="font-black text-gray-900 text-sm md:text-base mb-1">🧮 섹터 확대/축소 점수</h3>
+                  <p className="text-[11px] text-gray-400 font-medium mb-4 break-keep">
+                    장단기 성과차 점수(S&amp;P500 대비 과열 -1 / 과매도 +1) + 경기 국면 점수(위에서 고른 국면에서 유리한 3개 +1, 불리한 3개 -1). 합계가 +이면 비중 확대, -이면 비중 축소 후보예요.
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs md:text-sm whitespace-nowrap">
+                      <thead>
+                        <tr className="border-b border-gray-100 text-gray-400 font-bold text-left">
+                          <th className="py-2 pr-2">섹터</th>
+                          <th className="py-2 pr-2 text-right">장단기 차(vs S&amp;P)</th>
+                          <th className="py-2 pr-2 text-right">장단기</th>
+                          <th className="py-2 pr-2 text-right">국면 수익률</th>
+                          <th className="py-2 pr-2 text-right">국면</th>
+                          <th className="py-2 pr-2 text-right">합계</th>
+                          <th className="py-2 text-right">판정</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sectorScoreRows.map((r) => (
+                          <tr key={r.symbol} className="border-b border-gray-50 last:border-0">
+                            <td className="py-2 pr-2 font-bold text-gray-800">{r.label}</td>
+                            <td className="py-2 pr-2 text-right font-semibold text-gray-600">{r.rel == null ? '-' : `${r.rel > 0 ? '+' : ''}${r.rel.toFixed(1)}%p`}</td>
+                            <td className="py-2 pr-2 text-right font-semibold text-gray-700">{r.gapScore > 0 ? `+${r.gapScore}` : r.gapScore}</td>
+                            <td className="py-2 pr-2 text-right font-semibold text-gray-600">{r.cycleReturn == null ? '-' : `${r.cycleReturn}%`}</td>
+                            <td className="py-2 pr-2 text-right font-semibold text-gray-700">{r.cycleScore > 0 ? `+${r.cycleScore}` : r.cycleScore}</td>
+                            <td className={`py-2 pr-2 text-right font-black ${r.total > 0 ? 'text-emerald-600' : r.total < 0 ? 'text-red-500' : 'text-gray-400'}`}>{r.total > 0 ? `+${r.total}` : r.total}</td>
+                            <td className="py-2 text-right">
+                              {r.total > 0 ? <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">확대</span>
+                                : r.total < 0 ? <span className="text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded">축소</span>
+                                : <span className="text-[10px] font-bold text-gray-400">유지</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-medium mt-3 break-keep">
+                    * 장단기 차 = (섹터의 최근 1년 − 장기 연평균) − (S&amp;P500의 같은 값), ±{GAP_THRESHOLD}%p 이상이면 점수 부여. 국면별 섹터 수익률은 교안 표의 고정값이며, 통신 섹터는 표에 없어 국면 점수가 0이에요. 상장 10년 미만 섹터는 상장 이후 기간 기준이라 참고용이에요.
+                  </p>
+
+                  <h4 className="font-black text-gray-900 text-sm mt-6 mb-1">📦 내 ETF별 (확대 섹터 − 축소 섹터) 비중</h4>
+                  <p className="text-[11px] text-gray-400 font-medium mb-3 break-keep">값이 클수록 비중을 늘릴 ETF, 작을수록 줄일 ETF 후보예요. (수량을 입력한 보유 ETF만 표시)</p>
+                  {etfExpandShrinkRows.length === 0 ? (
+                    <p className="text-xs font-bold text-gray-400 py-4 text-center">[📊 보유 비중 체크] 탭에서 수량을 먼저 입력해 주세요.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs md:text-sm whitespace-nowrap">
+                        <thead>
+                          <tr className="border-b border-gray-100 text-gray-400 font-bold text-left">
+                            <th className="py-2 pr-2">ETF</th>
+                            <th className="py-2 pr-2 text-right">확대 섹터 비중</th>
+                            <th className="py-2 pr-2 text-right">축소 섹터 비중</th>
+                            <th className="py-2 text-right">확대 − 축소</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {etfExpandShrinkRows.map((e, idx) => (
+                            <tr key={e.code} className="border-b border-gray-50 last:border-0">
+                              <td className="py-2 pr-2 font-bold text-gray-800">
+                                {e.name}
+                                {idx === 0 && etfExpandShrinkRows.length > 1 && e.diff > 0 && <span className="ml-1.5 text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">늘릴 후보</span>}
+                                {idx === etfExpandShrinkRows.length - 1 && etfExpandShrinkRows.length > 1 && e.diff < 0 && <span className="ml-1.5 text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">줄일 후보</span>}
+                              </td>
+                              <td className="py-2 pr-2 text-right font-semibold text-gray-600">{e.over.toFixed(1)}%</td>
+                              <td className="py-2 pr-2 text-right font-semibold text-gray-600">{e.under.toFixed(1)}%</td>
+                              <td className={`py-2 text-right font-black ${e.diff > 0 ? 'text-emerald-600' : e.diff < 0 ? 'text-red-500' : 'text-gray-400'}`}>{e.diff > 0 ? '+' : ''}{e.diff.toFixed(1)}%p</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {totalPortfolioValue === 0 ? (
                 <div className="bg-white rounded-2xl p-8 border border-gray-100 text-center font-bold text-gray-400 text-sm shadow-sm">

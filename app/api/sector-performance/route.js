@@ -94,7 +94,15 @@ export async function GET() {
         };
       })
     );
-    return NextResponse.json({ sectors: results });
+    // 장단기 성과 차이를 "S&P500 대비" 로 비교하기 위한 기준(SPY)
+    const bench = await fetchOnePerformance('SPY');
+    const benchmark = {
+      symbol: 'SPY',
+      oneYearReturn: bench?.oneYearReturn ?? null,
+      longTermCagr: bench?.longTermCagr ?? null,
+      dataYears: bench?.dataYears ?? null,
+    };
+    return NextResponse.json({ sectors: results, benchmark });
   } catch (error) {
     return NextResponse.json({ error: '섹터별 ETF 수익률 데이터를 불러오지 못했습니다.' }, { status: 500 });
   }
