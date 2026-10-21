@@ -111,10 +111,12 @@ function QuickLinksSection() {
         <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
           <span className="text-amber-400 font-bold text-xs bg-amber-950/50 px-2 py-0.5 rounded border border-amber-900 min-w-[56px] text-center">Cycle</span>
           <a href="https://institutional.fidelity.com/app/item/RD_13569_40890.html" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">경기사이클</a>
+          <span className="shrink-0 text-[11px] text-gray-500 font-medium">1·4·7·10월 발표</span>
         </li>
         <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
           <span className="text-emerald-400 font-bold text-xs bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900 min-w-[56px] text-center">FED</span>
           <a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">FED 점도표</a>
+          <span className="shrink-0 text-[11px] text-gray-500 font-medium">3·6·9·12월 발표</span>
         </li>
 
         {/* 🆕 해외주식 기사 사이트: 중요도 높은 2개는 항상 노출 */}

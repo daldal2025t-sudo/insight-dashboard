@@ -23,8 +23,8 @@ const SECTOR_CYCLE_RETURNS = {
   consumer_def: { early: 18.0, mid: 10.6, late: 14.6, recession: 1.0 },
   utilities:    { early: 14.7, mid: 7.6,  late: 11.8, recession: -1.6 },
 };
-// 경기 국면 점수의 상위/하위 3개를 고를 때 제외하는 섹터 (부동산, 에너지)
-const CYCLE_RANK_EXCLUDED = ['realestate', 'energy'];
+// 경기 국면 점수의 상위/하위 3개를 고를 때 제외하는 섹터 (부동산, 에너지, 기초소재)
+const CYCLE_RANK_EXCLUDED = ['realestate', 'energy', 'basic'];
 // 섹터의 (1년 − 장기 연평균) 이 S&P500 의 같은 값보다 이만큼(%p) 이상 크면 과열(-1), 작으면 과매도(+1)
 const GAP_THRESHOLD = 5;
 
@@ -60,6 +60,12 @@ export default function ArchivePage() {
   const [sectorPerfLoading, setSectorPerfLoading] = useState(false);
   const [sectorPerfError, setSectorPerfError] = useState(null);
   const [sectorBenchmark, setSectorBenchmark] = useState(null);
+
+  // 🧾 리밸런싱 계산기 (적립식/거치식) 입력값. ''이면 "확대−축소" 표에서 자동 선택.
+  const [calcMode, setCalcMode] = useState('dca');
+  const [calcBudget, setCalcBudget] = useState('');
+  const [calcExpandCode, setCalcExpandCode] = useState('');
+  const [calcShrinkCode, setCalcShrinkCode] = useState('');
 
   // extraList: 사용자가 직접 추가한 티커 배열. masterPool 전체를 다시 받아오면서
   // 이 티커들의 실시간 가격/섹터/배당/수익률도 함께 채워서 내려받는다.
@@ -385,6 +391,48 @@ export default function ArchivePage() {
         })
         .sort((a, b) => b.diff - a.diff)
     : [];
+
+  // 🧾 리밸런싱 계산기: 늘릴 ETF 1개(확대−축소 최대) / 줄일 ETF 1개(최소) 기본 선택
+  // 적립식: 줄일 ETF의 매수 비중을 절반으로 줄이고, 줄어든 만큼 늘릴 ETF에 더함
+  // 거치식: 줄일 ETF 보유 수량의 1/4을 매도하고, 그 금액으로 늘릴 ETF를 매수
+  const SHRINK_RATIO_DCA = 0.5;
+  const SELL_RATIO_LUMP = 0.25;
+  const heldForCalc = finalMappedItems.filter(i => i.evalValue > 0);
+  const toKrwPrice = (item) => (item.isUS ? getRawPrice(item.value) * exchangeRate : getRawPrice(item.value));
+  const autoExpandCode = etfExpandShrinkRows[0]?.code;
+  const autoShrinkCode = etfExpandShrinkRows[etfExpandShrinkRows.length - 1]?.code;
+  const calcExpand = heldForCalc.find(i => i.code === (calcExpandCode || autoExpandCode));
+  const calcShrink = heldForCalc.find(i => i.code === (calcShrinkCode || autoShrinkCode));
+  const calcValid = etfExpandShrinkRows.length >= 2 && calcExpand && calcShrink
+    && calcExpand.code !== calcShrink.code && toKrwPrice(calcExpand) > 0 && toKrwPrice(calcShrink) > 0;
+
+  const calcMonthly = parseFloat(calcBudget) || 0;
+  let dcaRows = [];
+  let dcaLeftover = 0;
+  if (calcValid && calcMode === 'dca') {
+    dcaRows = heldForCalc.map(i => {
+      const base = i.realWeight;
+      const next = i.code === calcShrink.code ? base * SHRINK_RATIO_DCA
+        : i.code === calcExpand.code ? base + calcShrink.realWeight * (1 - SHRINK_RATIO_DCA)
+        : base;
+      const price = toKrwPrice(i);
+      const amount = calcMonthly * next / 100;
+      const shares = price > 0 ? Math.floor(amount / price) : 0;
+      return { code: i.code, name: i.name, base, next, price, amount, shares, cost: shares * price, role: i.code === calcShrink.code ? 'shrink' : i.code === calcExpand.code ? 'expand' : null };
+    });
+    dcaLeftover = calcMonthly - dcaRows.reduce((acc, r) => acc + r.cost, 0);
+  }
+
+  let lump = null;
+  if (calcValid && calcMode === 'lump') {
+    const sellQty = Math.floor((calcShrink.qty || 0) * SELL_RATIO_LUMP);
+    const sellPrice = toKrwPrice(calcShrink);
+    const buyPrice = toKrwPrice(calcExpand);
+    const proceeds = sellQty * sellPrice;
+    const buyQty = Math.floor(proceeds / buyPrice);
+    lump = { sellQty, sellPrice, proceeds, buyQty, buyPrice, buyCost: buyQty * buyPrice, leftover: proceeds - buyQty * buyPrice };
+  }
+  const fmtKrw = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
 
   const sectorsFinal = [
     { label: '정보기술 (Tech)', val: pTech }, { label: '금융서비스 (Finance)', val: pFin }, { label: '헬스케어 (Health)', val: pHealth }, { label: '산업재 (Industrials)', val: pInd },
@@ -764,6 +812,98 @@ export default function ArchivePage() {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {sectorScoreRows && etfExpandShrinkRows.length >= 2 && (
+                <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
+                  <h3 className="font-black text-gray-900 text-sm md:text-base mb-1">🧾 리밸런싱 계산기 (얼마를 사고팔까?)</h3>
+                  <p className="text-[11px] text-gray-400 font-medium mb-4 break-keep">
+                    위 표에서 확대−축소 값이 가장 큰 ETF를 늘리고, 가장 작은 ETF를 줄이는 걸 기본으로 계산해요. 아래에서 직접 바꿀 수도 있어요. (교안 방식, 참고용이며 투자 판단은 본인 몫이에요)
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl mb-4">
+                    <button onClick={() => setCalcMode('dca')} className={`py-2 rounded-lg text-xs font-black transition-all ${calcMode === 'dca' ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-500'}`}>📅 적립식 (매달 사는 돈)</button>
+                    <button onClick={() => setCalcMode('lump')} className={`py-2 rounded-lg text-xs font-black transition-all ${calcMode === 'lump' ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-500'}`}>💼 거치식 (보유분 갈아타기)</button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                    <label className="flex flex-col gap-1 text-[11px] font-bold text-gray-500">
+                      🟢 늘릴 ETF
+                      <select value={calcExpandCode || autoExpandCode || ''} onChange={(e) => setCalcExpandCode(e.target.value)} className="border border-gray-200 rounded-lg px-2 py-2 text-xs font-bold text-gray-800 bg-white">
+                        {etfExpandShrinkRows.map(e => <option key={e.code} value={e.code}>{e.name}</option>)}
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1 text-[11px] font-bold text-gray-500">
+                      🔴 줄일 ETF
+                      <select value={calcShrinkCode || autoShrinkCode || ''} onChange={(e) => setCalcShrinkCode(e.target.value)} className="border border-gray-200 rounded-lg px-2 py-2 text-xs font-bold text-gray-800 bg-white">
+                        {etfExpandShrinkRows.map(e => <option key={e.code} value={e.code}>{e.name}</option>)}
+                      </select>
+                    </label>
+                  </div>
+
+                  {!calcValid && (
+                    <p className="text-xs font-bold text-red-500 py-2">늘릴 ETF와 줄일 ETF를 서로 다른 종목으로 골라 주세요. (현재가를 불러오지 못한 종목은 계산할 수 없어요)</p>
+                  )}
+
+                  {calcValid && calcMode === 'dca' && (
+                    <div>
+                      <label className="flex flex-col gap-1 text-[11px] font-bold text-gray-500 mb-4">
+                        이번 달 투자 가능 금액 (원)
+                        <input type="number" inputMode="numeric" placeholder="예: 1000000" value={calcBudget} onChange={(e) => setCalcBudget(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold text-gray-900 outline-none" />
+                      </label>
+                      {calcMonthly > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs md:text-sm whitespace-nowrap">
+                            <thead>
+                              <tr className="border-b border-gray-100 text-gray-400 font-bold text-left">
+                                <th className="py-2 pr-2">ETF</th>
+                                <th className="py-2 pr-2 text-right">기본 비중</th>
+                                <th className="py-2 pr-2 text-right">변경 비중</th>
+                                <th className="py-2 pr-2 text-right">현재가(원)</th>
+                                <th className="py-2 pr-2 text-right">매수 주수</th>
+                                <th className="py-2 text-right">매수 금액</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dcaRows.map(r => (
+                                <tr key={r.code} className={`border-b border-gray-50 last:border-0 ${r.role === 'expand' ? 'bg-emerald-50/50' : r.role === 'shrink' ? 'bg-red-50/50' : ''}`}>
+                                  <td className="py-2 pr-2 font-bold text-gray-800">{r.name}</td>
+                                  <td className="py-2 pr-2 text-right font-semibold text-gray-600">{r.base.toFixed(1)}%</td>
+                                  <td className={`py-2 pr-2 text-right font-black ${r.role === 'expand' ? 'text-emerald-600' : r.role === 'shrink' ? 'text-red-500' : 'text-gray-700'}`}>{r.next.toFixed(1)}%</td>
+                                  <td className="py-2 pr-2 text-right font-semibold text-gray-600">{fmtKrw(r.price)}</td>
+                                  <td className="py-2 pr-2 text-right font-black text-gray-800">{r.shares}주</td>
+                                  <td className="py-2 text-right font-semibold text-gray-700">{fmtKrw(r.cost)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          <p className="text-[11px] text-gray-500 font-semibold mt-3">남는 금액: {fmtKrw(dcaLeftover)} (주 단위로 내림 계산)</p>
+                        </div>
+                      ) : (
+                        <p className="text-xs font-bold text-gray-400 py-2">투자 금액을 입력하면 ETF별 매수 주수가 나와요.</p>
+                      )}
+                      <p className="text-[10px] text-gray-400 font-medium mt-2 break-keep">* 기본 비중은 현재 보유 평가금액 비중이에요. 줄일 ETF의 매수 비중을 절반으로 줄이고, 줄어든 만큼 늘릴 ETF에 더해요. 기존 보유 ETF는 팔지 않아요. 미국 ETF는 환율({Math.round(exchangeRate).toLocaleString('ko-KR')}원)로 환산한 값이에요.</p>
+                    </div>
+                  )}
+
+                  {calcValid && calcMode === 'lump' && lump && (
+                    <div className="flex flex-col gap-3">
+                      <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-semibold text-gray-700">
+                        <p className="font-black text-red-600 mb-1">① 매도: {calcShrink.name}</p>
+                        <p>보유 {calcShrink.qty}주의 1/4 → <strong>{lump.sellQty}주 매도</strong> ({fmtKrw(lump.sellPrice)} × {lump.sellQty} = {fmtKrw(lump.proceeds)})</p>
+                      </div>
+                      <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-semibold text-gray-700">
+                        <p className="font-black text-emerald-700 mb-1">② 매수: {calcExpand.name}</p>
+                        {lump.sellQty > 0 ? (
+                          <p>{fmtKrw(lump.proceeds)} ÷ {fmtKrw(lump.buyPrice)} → <strong>{lump.buyQty}주 매수</strong> ({fmtKrw(lump.buyCost)}, 남는 금액 {fmtKrw(lump.leftover)})</p>
+                        ) : (
+                          <p>보유 수량이 너무 적어 1/4을 팔 수 없어요. (보유 수량을 확인해 주세요)</p>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-400 font-medium break-keep">* 거치식은 줄일 ETF 보유 수량의 1/4을 팔아 그 금액만큼 늘릴 ETF를 사는 방식이에요. 수수료·세금(양도소득세 등)·환전 비용은 반영하지 않았어요. 주 단위로 내림 계산해요.</p>
                     </div>
                   )}
                 </div>
