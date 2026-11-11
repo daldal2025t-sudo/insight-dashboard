@@ -25,8 +25,12 @@ const SECTOR_CYCLE_RETURNS = {
 };
 // 경기 국면 점수의 상위/하위 3개를 고를 때 제외하는 섹터 (부동산, 에너지, 기초소재)
 const CYCLE_RANK_EXCLUDED = ['realestate', 'energy', 'basic'];
-// 섹터의 (1년 − 장기 연평균) 이 S&P500 의 같은 값보다 이만큼(%p) 이상 크면 과열(-1), 작으면 과매도(+1)
-const GAP_THRESHOLD = 5;
+// 장단기 성과차(1년−10년) 기준 "확대 후보"에서 제외하는 섹터 (변동성 때문에 확대 후보로 선정하지 않음)
+const GAP_EXPAND_EXCLUDED = ['basic', 'energy', 'realestate'];
+// ETF 섹터 비중 표에 보여줄 섹터 순서
+const SECTOR_ORDER = ['tech', 'communication', 'consumer_def', 'consumer_cyc', 'finance', 'health', 'utilities', 'ind', 'basic', 'energy', 'realestate'];
+const fmtNum = (v, d = 1) => (v == null ? '–' : v.toFixed(d));
+const fmtSigned = (v, d = 1) => (v == null ? '–' : `${v > 0 ? '+' : ''}${v.toFixed(d)}`);
 
 export default function ArchivePage() {
   const [activeTab, setActiveTab] = useState('myassets');
@@ -359,17 +363,35 @@ export default function ArchivePage() {
   };
   const currentCycleData = cycleDefinitions[cyclePhase];
 
-  // 🧮 섹터 확대/축소 점수 = 장단기 성과차 점수(-1/0/+1) + 경기 국면 점수(유리 3개 +1, 불리 3개 -1)
+  // 📊 1단계: 섹터 ETF 별 1년/5년/10년 수익률과 단기−장기 차이. 1년−10년 상위 3개 = 축소 후보, 하위 3개 = 확대 후보.
+  // (10년 데이터가 없는 섹터는 순위에서 제외, 기초소재·에너지·부동산은 확대 후보에서 제외)
+  const sectorMetricRows = sectorPerf ? sectorPerf.map((s) => {
+    const has10y = s.longTermCagr != null && s.dataYears != null && s.dataYears >= 9.5;
+    return {
+      ...s,
+      key: SECTOR_ETF_KEY[s.symbol],
+      cagr10y: has10y ? s.longTermCagr : null,
+      gap5: s.oneYearReturn != null && s.fiveYearCagr != null ? s.oneYearReturn - s.fiveYearCagr : null,
+      gap10: s.oneYearReturn != null && has10y ? s.oneYearReturn - s.longTermCagr : null,
+      shrinkCandidate: false,
+      expandCandidate: false,
+    };
+  }) : [];
+  if (sectorMetricRows.length > 0) {
+    const withGap = sectorMetricRows.filter(r => r.gap10 != null);
+    [...withGap].sort((a, b) => b.gap10 - a.gap10).slice(0, 3).forEach(r => { r.shrinkCandidate = true; });
+    [...withGap].filter(r => !GAP_EXPAND_EXCLUDED.includes(r.key)).sort((a, b) => a.gap10 - b.gap10).slice(0, 3).forEach(r => { r.expandCandidate = true; });
+  }
+  const sectorLabelByKey = {};
+  sectorMetricRows.forEach(r => { sectorLabelByKey[r.key] = r.label; });
+
+  // 🧮 2단계: 섹터 확대/축소 점수 = 장단기 점수(축소 후보 -1 / 확대 후보 +1) + 경기 국면 점수(유리 3개 +1, 불리 3개 -1)
   let sectorScoreRows = null;
-  if (sectorPerf && sectorBenchmark && sectorBenchmark.oneYearReturn != null && sectorBenchmark.longTermCagr != null) {
-    const benchGap = sectorBenchmark.oneYearReturn - sectorBenchmark.longTermCagr;
-    const rows = sectorPerf.map((s) => {
-      const key = SECTOR_ETF_KEY[s.symbol];
-      const gap = s.oneYearReturn != null && s.longTermCagr != null ? s.oneYearReturn - s.longTermCagr : null;
-      const rel = gap != null ? gap - benchGap : null;
-      const gapScore = rel == null ? 0 : rel >= GAP_THRESHOLD ? -1 : rel <= -GAP_THRESHOLD ? 1 : 0;
-      const cycleReturn = SECTOR_CYCLE_RETURNS[key]?.[cyclePhase] ?? null;
-      return { symbol: s.symbol, label: s.label, key, rel, gapScore, cycleReturn, cycleScore: 0 };
+  if (sectorMetricRows.length > 0) {
+    const rows = sectorMetricRows.map((s) => {
+      const gapScore = s.shrinkCandidate ? -1 : s.expandCandidate ? 1 : 0;
+      const cycleReturn = SECTOR_CYCLE_RETURNS[s.key]?.[cyclePhase] ?? null;
+      return { symbol: s.symbol, label: s.label, key: s.key, gap10: s.gap10, gapScore, cycleReturn, cycleScore: 0 };
     });
     const ranked = rows.filter(r => r.cycleReturn != null && !CYCLE_RANK_EXCLUDED.includes(r.key)).sort((a, b) => b.cycleReturn - a.cycleReturn);
     ranked.slice(0, 3).forEach(r => { r.cycleScore = 1; });
@@ -387,7 +409,7 @@ export default function ArchivePage() {
         .map(i => {
           const over = sumSectors(i.xray.sectors, overweightKeys);
           const under = sumSectors(i.xray.sectors, underweightKeys);
-          return { code: i.code, name: i.name, over, under, diff: over - under };
+          return { code: i.code, name: i.name, sectors: i.xray.sectors, over, under, diff: over - under };
         })
         .sort((a, b) => b.diff - a.diff)
     : [];
@@ -683,18 +705,11 @@ export default function ArchivePage() {
 
           {activeTab === 'rebalance' && (
             <div className="flex flex-col gap-6">
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                <label className="block text-xs font-black text-slate-500 mb-3 tracking-wider">🗺️ CURRENT MACRO CYCLE STATE (현재 글로벌 경기 국면 선택)</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-100 p-1 rounded-xl">
-                  <button onClick={() => setCyclePhase('early')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'early' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>🌱 1. 초기/회복기</button>
-                  <button onClick={() => setCyclePhase('mid')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'mid' ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>⚖️ 2. 확장/중기</button>
-                  <button onClick={() => setCyclePhase('late')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'late' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>🍂 3. 후기/둔화기</button>
-                  <button onClick={() => setCyclePhase('recession')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'recession' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>❄️ 4. 침체 국면</button>
-                </div>
-              </div>
-
               <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="font-black text-gray-900 text-sm md:text-base mb-4">📊 미국 섹터별 ETF 수익률 (실시간, 7일마다 갱신)</h3>
+                <h3 className="font-black text-gray-900 text-sm md:text-base mb-1">📊 1단계. 단·장기 성과차 (미국 섹터별 ETF, 7일마다 갱신)</h3>
+                <p className="text-[11px] text-gray-400 font-medium mb-4 break-keep">
+                  결과값이 양수 = 단기 성과 &gt; 장기 성과 = 단기 성과가 과열된 것이니 비중을 줄여야 해요. 1년−10년 값이 가장 큰 3개가 축소 후보, 가장 작은 3개가 확대 후보예요.
+                </p>
 
                 {sectorPerfLoading && (
                   <div className="text-center py-8 text-gray-400 font-bold text-sm">섹터별 수익률 데이터를 불러오는 중... ⏳</div>
@@ -706,52 +721,76 @@ export default function ArchivePage() {
 
                 {sectorPerf && (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs md:text-sm">
+                    <table className="w-full text-xs md:text-sm whitespace-nowrap">
                       <thead>
                         <tr className="border-b border-gray-100 text-gray-400 font-bold text-left">
                           <th className="py-2 pr-2">섹터</th>
-                          <th className="py-2 pr-2">티커</th>
-                          <th className="py-2 pr-2 text-right">최근 1년</th>
-                          <th className="py-2 text-right">장기 연평균(CAGR)</th>
+                          <th className="py-2 pr-2 text-right">1년</th>
+                          <th className="py-2 pr-2 text-right">5년</th>
+                          <th className="py-2 pr-2 text-right">10년</th>
+                          <th className="py-2 pr-2 text-right">1년−5년</th>
+                          <th className="py-2 pr-2 text-right">1년−10년</th>
+                          <th className="py-2 pr-2 text-center text-orange-500">비중 축소<br />후보</th>
+                          <th className="py-2 text-center text-emerald-600">비중 확대<br />후보</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {sectorPerf.map((s) => (
-                          <tr key={s.symbol} className="border-b border-gray-50 last:border-0">
-                            <td className="py-2 pr-2 font-bold text-gray-800">{s.label}</td>
-                            <td className="py-2 pr-2 text-gray-400 font-semibold">{s.symbol}</td>
-                            <td className={`py-2 pr-2 text-right font-black ${s.oneYearReturn == null ? 'text-gray-300' : s.oneYearReturn >= 0 ? 'text-pink-600' : 'text-blue-500'}`}>
-                              {s.oneYearReturn == null ? '-' : `${s.oneYearReturn > 0 ? '+' : ''}${s.oneYearReturn}%`}
-                            </td>
-                            <td className={`py-2 text-right font-black ${s.longTermCagr == null ? 'text-gray-300' : s.longTermCagr >= 0 ? 'text-pink-600' : 'text-blue-500'}`}>
-                              {s.longTermCagr == null ? '-' : `${s.longTermCagr > 0 ? '+' : ''}${s.longTermCagr}%`}
-                              {s.dataYears != null && s.dataYears < 9.5 && (
-                                <span className="text-[9px] text-gray-400 font-medium ml-1">({s.dataYears}년)</span>
-                              )}
-                            </td>
+                        {sectorBenchmark && sectorBenchmark.oneYearReturn != null && (
+                          <tr className="border-b border-gray-100 bg-slate-50 text-gray-500 font-bold">
+                            <td className="py-2 pr-2">S&amp;P500<span className="block text-[9px] font-semibold text-gray-400">기준점 (SPY)</span></td>
+                            <td className="py-2 pr-2 text-right">{fmtNum(sectorBenchmark.oneYearReturn)}%</td>
+                            <td className="py-2 pr-2 text-right">{fmtNum(sectorBenchmark.fiveYearCagr)}%</td>
+                            <td className="py-2 pr-2 text-right">{fmtNum(sectorBenchmark.longTermCagr)}%</td>
+                            <td className="py-2 pr-2 text-right">{sectorBenchmark.fiveYearCagr != null ? `${fmtSigned(sectorBenchmark.oneYearReturn - sectorBenchmark.fiveYearCagr)}%p` : '–'}</td>
+                            <td className="py-2 pr-2 text-right">{sectorBenchmark.longTermCagr != null ? `${fmtSigned(sectorBenchmark.oneYearReturn - sectorBenchmark.longTermCagr)}%p` : '–'}</td>
+                            <td></td>
+                            <td></td>
+                          </tr>
+                        )}
+                        {sectorMetricRows.map((s) => (
+                          <tr key={s.symbol} className={`border-b border-gray-50 last:border-0 ${s.shrinkCandidate ? 'bg-orange-50' : s.expandCandidate ? 'bg-emerald-50' : ''}`}>
+                            <td className="py-2 pr-2 font-bold text-gray-800">{s.label}<span className="block text-[9px] font-semibold text-gray-400">{s.symbol}</span></td>
+                            <td className="py-2 pr-2 text-right font-semibold text-gray-700">{fmtNum(s.oneYearReturn)}%</td>
+                            <td className="py-2 pr-2 text-right font-semibold text-gray-700">{fmtNum(s.fiveYearCagr)}%</td>
+                            <td className="py-2 pr-2 text-right font-semibold text-gray-700">{fmtNum(s.cagr10y)}%</td>
+                            <td className="py-2 pr-2 text-right font-black text-orange-500">{s.gap5 == null ? '–' : `${fmtSigned(s.gap5)}%p`}</td>
+                            <td className="py-2 pr-2 text-right font-black text-orange-500">{s.gap10 == null ? '–' : `${fmtSigned(s.gap10)}%p`}</td>
+                            <td className="py-2 pr-2 text-center font-black text-orange-500">{s.shrinkCandidate ? '✓' : ''}</td>
+                            <td className={`py-2 text-center font-black text-emerald-600 ${GAP_EXPAND_EXCLUDED.includes(s.key) ? 'bg-gray-200' : ''}`}>{s.expandCandidate ? '✓' : ''}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                     <p className="text-[10px] text-gray-400 font-medium mt-3 break-keep">
-                      * 상장한 지 10년이 안 된 ETF(부동산·커뮤니케이션 등)는 상장 이후 실제 기간을 기준으로 연평균을 계산했어요. 데이터는 7일마다 새로 갱신됩니다.
+                      * 5년·10년은 연평균 수익률이에요. 상장 10년 미만인 섹터(통신서비스)는 10년 값이 없어 순위에서 제외했어요.<br />
+                      * 기초소재·에너지·부동산은 확대 후보에 들어와도 변동성을 고려해 최종 확대 후보로 선정하지 않아요(회색 칸).
                     </p>
                   </div>
                 )}
               </div>
 
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                <label className="block text-xs font-black text-slate-500 mb-3 tracking-wider">🗺️ CURRENT MACRO CYCLE STATE (현재 글로벌 경기 국면 선택)</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-100 p-1 rounded-xl">
+                  <button onClick={() => setCyclePhase('early')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'early' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>🌱 1. 초기/회복기</button>
+                  <button onClick={() => setCyclePhase('mid')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'mid' ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>⚖️ 2. 확장/중기</button>
+                  <button onClick={() => setCyclePhase('late')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'late' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>🍂 3. 후기/둔화기</button>
+                  <button onClick={() => setCyclePhase('recession')} className={`py-2.5 rounded-lg text-xs font-black transition-all ${cyclePhase === 'recession' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>❄️ 4. 침체 국면</button>
+                </div>
+              </div>
+
               {sectorScoreRows && (
                 <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
-                  <h3 className="font-black text-gray-900 text-sm md:text-base mb-1">🧮 섹터 확대/축소 점수</h3>
+                  <h3 className="font-black text-gray-900 text-sm md:text-base mb-1">🧮 2단계. 경기 국면 + 섹터 확대/축소 점수</h3>
                   <p className="text-[11px] text-gray-400 font-medium mb-4 break-keep">
-                    장단기 성과차 점수(S&amp;P500 대비 과열 -1 / 과매도 +1) + 경기 국면 점수(위에서 고른 국면에서 유리한 3개 +1, 불리한 3개 -1). 합계가 +이면 비중 확대, -이면 비중 축소 후보예요.
+                    장단기 점수(1단계의 축소 후보 -1 / 확대 후보 +1) + 경기 국면 점수(위에서 고른 국면에서 유리한 3개 +1, 불리한 3개 -1). 합계가 +이면 비중 확대, -이면 비중 축소 후보예요.
                   </p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs md:text-sm whitespace-nowrap">
                       <thead>
                         <tr className="border-b border-gray-100 text-gray-400 font-bold text-left">
                           <th className="py-2 pr-2">섹터</th>
-                          <th className="py-2 pr-2 text-right">장단기 차(vs S&amp;P)</th>
+                          <th className="py-2 pr-2 text-right">1년−10년</th>
                           <th className="py-2 pr-2 text-right">장단기</th>
                           <th className="py-2 pr-2 text-right">국면 수익률</th>
                           <th className="py-2 pr-2 text-right">국면</th>
@@ -763,7 +802,7 @@ export default function ArchivePage() {
                         {sectorScoreRows.map((r) => (
                           <tr key={r.symbol} className="border-b border-gray-50 last:border-0">
                             <td className="py-2 pr-2 font-bold text-gray-800">{r.label}</td>
-                            <td className="py-2 pr-2 text-right font-semibold text-gray-600">{r.rel == null ? '-' : `${r.rel > 0 ? '+' : ''}${r.rel.toFixed(1)}%p`}</td>
+                            <td className="py-2 pr-2 text-right font-semibold text-gray-600">{r.gap10 == null ? '-' : `${fmtSigned(r.gap10)}%p`}</td>
                             <td className="py-2 pr-2 text-right font-semibold text-gray-700">{r.gapScore > 0 ? `+${r.gapScore}` : r.gapScore}</td>
                             <td className="py-2 pr-2 text-right font-semibold text-gray-600">{r.cycleReturn == null ? '-' : `${r.cycleReturn}%`}</td>
                             <td className="py-2 pr-2 text-right font-semibold text-gray-700">{r.cycleScore > 0 ? `+${r.cycleScore}` : r.cycleScore}</td>
@@ -779,39 +818,60 @@ export default function ArchivePage() {
                     </table>
                   </div>
                   <p className="text-[10px] text-gray-400 font-medium mt-3 break-keep">
-                    * 장단기 차 = (섹터의 최근 1년 − 장기 연평균) − (S&amp;P500의 같은 값), ±{GAP_THRESHOLD}%p 이상이면 점수 부여. 국면별 섹터 수익률은 교안 표의 고정값이며, 통신 섹터는 표에 없어 국면 점수가 0이에요. 상장 10년 미만 섹터는 상장 이후 기간 기준이라 참고용이에요.
-                  </p>
+                    * 국면별 섹터 수익률은 교안 표의 고정값이며, 통신 섹터는 표에 없어 국면 점수가 0이에요. 경기 국면 점수의 상위·하위 3개를 고를 때 부동산·에너지·기초소재는 제외해요.</p>
 
-                  <h4 className="font-black text-gray-900 text-sm mt-6 mb-1">📦 내 ETF별 (확대 섹터 − 축소 섹터) 비중</h4>
-                  <p className="text-[11px] text-gray-400 font-medium mb-3 break-keep">값이 클수록 비중을 늘릴 ETF, 작을수록 줄일 ETF 후보예요. (수량을 입력한 보유 ETF만 표시)</p>
+                  <h4 className="font-black text-gray-900 text-sm mt-6 mb-1">📦 3단계. 내 ETF의 섹터별 비중 — 높일/낮출 섹터 합 확인</h4>
+                  <p className="text-[11px] text-gray-400 font-medium mb-3 break-keep">초록 줄 = 비중을 높일(확대) 섹터, 주황 줄 = 낮출(축소) 섹터예요. 수량을 입력한 보유 ETF만 표시돼요. SPYM·SPMO처럼 목록에 없는 ETF는 내 자산 탭 검색창에 티커를 입력해 추가할 수 있어요.</p>
                   {etfExpandShrinkRows.length === 0 ? (
                     <p className="text-xs font-bold text-gray-400 py-4 text-center">[📊 보유 비중 체크] 탭에서 수량을 먼저 입력해 주세요.</p>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs md:text-sm whitespace-nowrap">
+                      <table className="w-full text-xs md:text-sm whitespace-nowrap border-collapse">
                         <thead>
-                          <tr className="border-b border-gray-100 text-gray-400 font-bold text-left">
-                            <th className="py-2 pr-2">ETF</th>
-                            <th className="py-2 pr-2 text-right">확대 섹터 비중</th>
-                            <th className="py-2 pr-2 text-right">축소 섹터 비중</th>
-                            <th className="py-2 text-right">확대 − 축소</th>
+                          <tr className="text-gray-500 font-bold">
+                            <th className="py-2 px-2 text-left border border-gray-100 bg-gray-50">섹터</th>
+                            {etfExpandShrinkRows.map((e, idx) => (
+                              <th key={e.code} className="py-2 px-2 text-center border border-gray-100 bg-gray-50 max-w-[110px] whitespace-normal break-keep">
+                                {e.name}
+                                {idx === 0 && etfExpandShrinkRows.length > 1 && e.diff > 0 && <span className="block mt-1 text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">늘릴 후보</span>}
+                                {idx === etfExpandShrinkRows.length - 1 && etfExpandShrinkRows.length > 1 && e.diff < 0 && <span className="block mt-1 text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">줄일 후보</span>}
+                              </th>
+                            ))}
                           </tr>
                         </thead>
                         <tbody>
-                          {etfExpandShrinkRows.map((e, idx) => (
-                            <tr key={e.code} className="border-b border-gray-50 last:border-0">
-                              <td className="py-2 pr-2 font-bold text-gray-800">
-                                {e.name}
-                                {idx === 0 && etfExpandShrinkRows.length > 1 && e.diff > 0 && <span className="ml-1.5 text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">늘릴 후보</span>}
-                                {idx === etfExpandShrinkRows.length - 1 && etfExpandShrinkRows.length > 1 && e.diff < 0 && <span className="ml-1.5 text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">줄일 후보</span>}
-                              </td>
-                              <td className="py-2 pr-2 text-right font-semibold text-gray-600">{e.over.toFixed(1)}%</td>
-                              <td className="py-2 pr-2 text-right font-semibold text-gray-600">{e.under.toFixed(1)}%</td>
-                              <td className={`py-2 text-right font-black ${e.diff > 0 ? 'text-emerald-600' : e.diff < 0 ? 'text-red-500' : 'text-gray-400'}`}>{e.diff > 0 ? '+' : ''}{e.diff.toFixed(1)}%p</td>
-                            </tr>
-                          ))}
+                          {SECTOR_ORDER.map((key) => {
+                            const isOver = overweightKeys.includes(key);
+                            const isUnder = underweightKeys.includes(key);
+                            const rowBg = isOver ? 'bg-emerald-50' : isUnder ? 'bg-orange-50' : '';
+                            return (
+                              <tr key={key} className={rowBg}>
+                                <td className="py-2 px-2 font-bold text-gray-800 border border-gray-100">{sectorLabelByKey[key] || key}</td>
+                                {etfExpandShrinkRows.map((e) => (
+                                  <td key={e.code} className="py-2 px-2 text-center font-semibold text-gray-700 border border-gray-100">{fmtNum(e.sectors[key] || 0, 2)}%</td>
+                                ))}
+                              </tr>
+                            );
+                          })}
+                          <tr className="bg-emerald-100 font-black text-gray-900">
+                            <td className="py-2 px-2 border border-gray-100">비중 높일 섹터 합</td>
+                            {etfExpandShrinkRows.map((e) => <td key={e.code} className="py-2 px-2 text-center border border-gray-100">{fmtNum(e.over, 2)}%</td>)}
+                          </tr>
+                          <tr className="bg-orange-100 font-black text-gray-900">
+                            <td className="py-2 px-2 border border-gray-100">비중 낮출 섹터 합</td>
+                            {etfExpandShrinkRows.map((e) => <td key={e.code} className="py-2 px-2 text-center border border-gray-100">{fmtNum(e.under, 2)}%</td>)}
+                          </tr>
+                          <tr className="font-black">
+                            <td className="py-2 px-2 border border-gray-100">비중 차이 (높일−낮출)</td>
+                            {etfExpandShrinkRows.map((e) => (
+                              <td key={e.code} className={`py-2 px-2 text-center border border-gray-100 ${e.diff > 0 ? 'text-emerald-600' : e.diff < 0 ? 'text-red-500' : 'text-gray-400'}`}>{fmtSigned(e.diff, 2)}%p</td>
+                            ))}
+                          </tr>
                         </tbody>
                       </table>
+                      <p className="text-[10px] text-gray-400 font-medium mt-3 break-keep">
+                        * 결과 숫자가 크다는 것은? 비중 높일 섹터 합이 낮출 섹터 합보다 크다는 뜻이에요. 차이가 가장 큰 ETF는 지금 시점에 유리한 섹터가 많아서 더 사도 되는 ETF, 가장 작은(마이너스) ETF는 줄일 후보예요.
+                      </p>
                     </div>
                   )}
                 </div>

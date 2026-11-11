@@ -7,17 +7,17 @@ const CACHE_SECONDS = 60 * 60 * 24 * 7; // 7일
 
 // 미국 GICS 11개 섹터 대표 SPDR ETF
 const SECTOR_ETFS = [
-  { symbol: 'XLK', label: '기술 (Technology)' },
-  { symbol: 'XLF', label: '금융 (Financials)' },
-  { symbol: 'XLV', label: '헬스케어 (Health Care)' },
-  { symbol: 'XLY', label: '임의소비재 (Cons. Discretionary)' },
-  { symbol: 'XLP', label: '필수소비재 (Cons. Staples)' },
-  { symbol: 'XLI', label: '산업재 (Industrials)' },
-  { symbol: 'XLE', label: '에너지 (Energy)' },
-  { symbol: 'XLU', label: '유틸리티 (Utilities)' },
-  { symbol: 'XLB', label: '소재 (Materials)' },
-  { symbol: 'XLRE', label: '부동산 (Real Estate)' },
-  { symbol: 'XLC', label: '커뮤니케이션 (Communication)' },
+  { symbol: 'XLK', label: '정보기술' },
+  { symbol: 'XLC', label: '통신서비스' },
+  { symbol: 'XLP', label: '필수소비재' },
+  { symbol: 'XLY', label: '임의소비재' },
+  { symbol: 'XLF', label: '금융' },
+  { symbol: 'XLV', label: '헬스케어' },
+  { symbol: 'XLU', label: '유틸리티' },
+  { symbol: 'XLI', label: '산업재' },
+  { symbol: 'XLB', label: '기초소재' },
+  { symbol: 'XLE', label: '에너지' },
+  { symbol: 'XLRE', label: '부동산' },
 ];
 
 // symbol 하나의 최근 1년 등락률 / (최대) 10년 연평균 등락률(CAGR)을 계산.
@@ -56,6 +56,24 @@ const fetchOnePerformanceRaw = async (symbol) => {
     }
     const oneYearAgoPrice = priceOf(closest);
 
+    // 5년 전과 가장 가까운 시점 → 5년 연평균(상장 5년 미만이면 계산하지 않음)
+    const fiveYearAgoTarget = new Date(lastDate);
+    fiveYearAgoTarget.setFullYear(lastDate.getFullYear() - 5);
+    let closest5 = null;
+    let minDiff5 = Infinity;
+    for (const q of quotes) {
+      const diff = Math.abs(new Date(q.date).getTime() - fiveYearAgoTarget.getTime());
+      if (diff < minDiff5) { minDiff5 = diff; closest5 = q; }
+    }
+    let fiveYearCagr = null;
+    if (closest5) {
+      const years5 = (lastDate.getTime() - new Date(closest5.date).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+      const price5 = priceOf(closest5);
+      if (years5 > 4.5 && price5 > 0) {
+        fiveYearCagr = (Math.pow(currentPrice / price5, 1 / years5) - 1) * 100;
+      }
+    }
+
     const oneYearReturn = oneYearAgoPrice ? ((currentPrice - oneYearAgoPrice) / oneYearAgoPrice) * 100 : null;
 
     const yearsSpan = (lastDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
@@ -65,6 +83,7 @@ const fetchOnePerformanceRaw = async (symbol) => {
 
     return {
       oneYearReturn: oneYearReturn !== null ? Math.round(oneYearReturn * 10) / 10 : null,
+      fiveYearCagr: fiveYearCagr !== null ? Math.round(fiveYearCagr * 10) / 10 : null,
       longTermCagr: longTermCagr !== null ? Math.round(longTermCagr * 10) / 10 : null,
       dataYears: Math.round(yearsSpan * 10) / 10,
     };
@@ -76,7 +95,7 @@ const fetchOnePerformanceRaw = async (symbol) => {
 // symbol별로 7일간 캐싱
 const fetchOnePerformance = unstable_cache(
   fetchOnePerformanceRaw,
-  ['sector-etf-performance'],
+  ['sector-etf-performance-v2'],
   { revalidate: CACHE_SECONDS }
 );
 
@@ -89,6 +108,7 @@ export async function GET() {
           symbol: etf.symbol,
           label: etf.label,
           oneYearReturn: perf?.oneYearReturn ?? null,
+          fiveYearCagr: perf?.fiveYearCagr ?? null,
           longTermCagr: perf?.longTermCagr ?? null,
           dataYears: perf?.dataYears ?? null,
         };
@@ -99,6 +119,7 @@ export async function GET() {
     const benchmark = {
       symbol: 'SPY',
       oneYearReturn: bench?.oneYearReturn ?? null,
+      fiveYearCagr: bench?.fiveYearCagr ?? null,
       longTermCagr: bench?.longTermCagr ?? null,
       dataYears: bench?.dataYears ?? null,
     };
