@@ -4,7 +4,7 @@ import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut } from
 import { auth, isFirebaseConfigured } from '../lib/firebase';
 import { initCloudSync, clearSyncedFlag } from '../lib/cloudSync';
 
-// 구글 로그인 / 로그아웃 버튼. Firebase 설정(환경변수)이 없으면 아무것도 그리지 않는다.
+// 구글 로그인 / 로그아웃 버튼. Firebase 설정(환경변수)이 없으면 '설정 필요' 안내 버튼을 보여준다.
 export default function AuthButton() {
   const [user, setUser] = useState(null);
   const [status, setStatus] = useState('signedout'); // signedout | syncing | synced | error
@@ -21,7 +21,19 @@ export default function AuthButton() {
     return () => { unsubscribe(); window.removeEventListener('cloud-sync-status', onStatus); };
   }, []);
 
-  if (!mounted || !isFirebaseConfigured || !auth) return null;
+  if (!mounted) return null;
+
+  // Firebase 환경변수가 없는 빌드: 버튼은 보이되, 눌렀을 때 설정이 필요하다고 안내한다.
+  if (!isFirebaseConfigured || !auth) {
+    return (
+      <button
+        onClick={() => alert('구글 로그인이 아직 설정되지 않았어요.\n\nVercel 환경변수(NEXT_PUBLIC_FIREBASE_API_KEY / AUTH_DOMAIN / PROJECT_ID / APP_ID)를 추가한 뒤 Redeploy 해야 로그인이 켜져요.')}
+        className="bg-white border border-dashed border-gray-300 text-gray-400 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm hover:bg-gray-50 transition shrink-0"
+      >
+        🔐 로그인 (설정 필요)
+      </button>
+    );
+  }
 
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();

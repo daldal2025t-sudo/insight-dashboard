@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import AuthButton from './components/AuthButton';
 
 function NewsCard({ category }) {
   const [news, setNews] = useState([]);
@@ -275,6 +276,7 @@ export default function Home() {
           <Link href="/journal" className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-2.5 rounded-full font-bold text-xs md:text-sm hover:opacity-90 transition shadow-md flex items-center gap-1">
             📝 개별주 투자 →
           </Link>
+          <AuthButton />
         </div>
       </header>
       
