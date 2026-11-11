@@ -1,8 +1,58 @@
 "use client";
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import AuthButton from '../components/AuthButton';
+import { saveData } from '../lib/cloudSync';
 
 const STORAGE_KEY = 'kijay_trade_journal';
+const SCREENER_KEY = 'kijay_screener_results';
+
+// ===== AI에게 최근 2년 뉴스 흐름 물어보기 프롬프트 =====
+function buildNewsPrompt(company) {
+  const name = company && company.trim() ? company.trim() : '[            ]';
+  return [
+    `${name}의 최근 2년간 주요 뉴스 흐름을 분석해 줘.`,
+    '① 먼저 기업의 사업 구조와 실적에 영향을 미치는 핵심 요인을 파악해 줘.',
+    '② 이를 바탕으로 최근 2년간 매월 가장 의미 있는 기사 1개씩 선정해 줘. 날짜, 제목, 핵심 내용, 원문 링크를 포함해 줘.',
+    '③ 시간순으로 정리하고, 기업에 대한 시장의 평가가 어떻게 변화했는지 설명해 줘.',
+    '④ 마지막으로 현재 시장이 우려하는 요인과 그 우려가 합리적인지 판단할 근거를 정리해 줘.',
+    '⑤ 무료로 원문을 확인할 수 있는 기사와 기업의 공식 발표를 우선할 것. 유료 기사만 확인된다면 별도로 표시해 주고, 실제 확인 가능한 자료를 바탕으로 긍정·부정 뉴스를 균형 있게 선정할 것.',
+  ].join('\n');
+}
+
+// ===== 스크리너 필터 기준 (stockanalysis.com Stock Screener) =====
+const SCREENER_PRESETS = {
+  blue: {
+    label: '🏛️ 대형우량주',
+    title: '대형우량주란?',
+    desc: '충분한 기업 규모를 확보하고, 높은 자본 효율성을 장기간 유지하면서 매출과 이익을 꾸준히 성장시켜 온 기업',
+    filters: [
+      { group: '거래소', name: 'Exchange', value: 'NASDAQ + NYSE', note: 'NASDAQ과 NYSE 두 곳을 모두 체크해요' },
+      { group: '시가총액', name: 'Market Cap Group', value: 'Large Cap + Mega Cap', note: 'Large Cap과 Mega Cap 두 개를 모두 체크해요' },
+      { group: '수익성', name: 'Return on Equity', value: '> 15%' },
+      { group: '수익성', name: 'Return on Equity (5Y)', value: '> 15%' },
+      { group: '자본 효율성', name: 'Return on Invested Capital', value: '> 15%' },
+      { group: '자본 효율성', name: 'Return on Capital (5Y)', value: '> 15%' },
+      { group: '매출 성장', name: 'Revenue Growth 3Y', value: '> 0%' },
+      { group: '매출 성장', name: 'Revenue Growth 5Y', value: '> 0%' },
+      { group: '이익 성장', name: 'EPS Growth 3Y', value: '> 0%' },
+      { group: '이익 성장', name: 'EPS Growth 5Y', value: '> 0%' },
+    ],
+  },
+  growth: {
+    label: '🚀 고성장주',
+    title: '고성장주란?',
+    desc: '연 20~25% 수준의 높은 성장률을 보이는 작고 공격적인 신생 기업',
+    filters: [
+      { group: '거래소', name: 'Exchange', value: 'NASDAQ + NYSE', note: 'NASDAQ과 NYSE 두 곳을 모두 체크해요' },
+      { group: '시가총액', name: 'Market Cap Group', value: 'Small Cap + Mid Cap', note: 'Small Cap과 Mid Cap 두 개를 모두 체크해요' },
+      { group: '매출 성장', name: 'Revenue Growth 5Y', value: '> 10%', note: '매출은 장기 성장성을 보려고 5년' },
+      { group: '이익 성장', name: 'EPS Growth 3Y', value: '> 20%', note: 'EPS는 최근 이익 성장세를 보려고 3년' },
+      { group: '수익성', name: 'Return on Equity', value: '> 15%' },
+      { group: '자본 효율성', name: 'Return on Invested Capital', value: '> 15%' },
+    ],
+  },
+};
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -97,6 +147,7 @@ export default function JournalPage() {
 
   // ===== 종목 진단(체크리스트 + 그레이엄 계산기) 상태 =====
   const [checks, setChecks] = useState({ q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false, q8: false, q9: false, q10: false });
+  const [showDividendGuide, setShowDividendGuide] = useState(false);
   const [grahamGrowth, setGrahamGrowth] = useState('');
   const [grahamCurrentPer, setGrahamCurrentPer] = useState('');
   const [grahamCurrentPrice, setGrahamCurrentPrice] = useState('');
@@ -106,19 +157,45 @@ export default function JournalPage() {
   const [weeklyLoading, setWeeklyLoading] = useState(false);
   const [weeklyError, setWeeklyError] = useState(null);
 
-  // 최초 로드: localStorage에서 매매일지 불러오기 (옛 스키마는 자동 변환)
-  useEffect(() => {
+  // ===== AI 뉴스 흐름 프롬프트 카드 상태 =====
+  const [promptCompany, setPromptCompany] = useState('');
+  const [promptCopied, setPromptCopied] = useState(false);
+
+  // ===== 스크리너 탭 상태 =====
+  const [screenerType, setScreenerType] = useState('blue');
+  const [screenerInput, setScreenerInput] = useState('');
+  const [screenerResults, setScreenerResults] = useState({ blue: [], growth: [] });
+
+  // 이 기기(localStorage)에 저장된 값을 화면 상태로 불러오기 (옛 스키마는 자동 변환).
+  // 구글 로그인 동기화가 끝나면 다시 호출된다.
+  const loadLocalState = () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) setEntries(JSON.parse(saved).map(migrateEntry));
     } catch (e) {}
+    try {
+      const savedScreener = localStorage.getItem(SCREENER_KEY);
+      if (savedScreener) {
+        const parsed = JSON.parse(savedScreener);
+        setScreenerResults({ blue: Array.isArray(parsed.blue) ? parsed.blue : [], growth: Array.isArray(parsed.growth) ? parsed.growth : [] });
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    loadLocalState();
     setIsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('cloud-sync-complete', loadLocalState);
+    return () => window.removeEventListener('cloud-sync-complete', loadLocalState);
   }, []);
 
   // 변경될 때마다 localStorage에 저장 (최초 로드 이전에는 덮어쓰지 않도록 방지)
   useEffect(() => {
     if (!isLoaded) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    saveData(STORAGE_KEY, entries);
   }, [entries, isLoaded]);
 
   // 기록된 티커들의 현재가를 실시간으로 조회 (캐싱 없음 - 항상 최신)
@@ -327,20 +404,50 @@ export default function JournalPage() {
     }
   }, [fairPrice, isUndervalued, currentPerVal, growthVal, currentPriceVal]);
 
+  // ===== AI 프롬프트 복사 =====
+  const handleCopyPrompt = () => {
+    copyTextToClipboard(
+      buildNewsPrompt(promptCompany),
+      () => { setPromptCopied(true); setTimeout(() => setPromptCopied(false), 2000); },
+      () => alert('복사에 실패했어요. 프롬프트를 길게 눌러 직접 복사해 주세요.')
+    );
+  };
+
+  // ===== 스크리너 결과 기록 =====
+  const handleAddScreenerTickers = () => {
+    const raw = screenerInput.split(/[,\n]/).map(t => t.trim()).filter(Boolean).map(t => (/^[A-Za-z0-9.\-^]+$/.test(t) ? t.toUpperCase() : t)).filter(t => t.length <= 30);
+    if (raw.length === 0) return;
+    const current = screenerResults[screenerType] || [];
+    const merged = [...new Set([...current, ...raw])];
+    const next = { ...screenerResults, [screenerType]: merged };
+    setScreenerResults(next);
+    saveData(SCREENER_KEY, next);
+    setScreenerInput('');
+  };
+
+  const handleRemoveScreenerTicker = (ticker) => {
+    const next = { ...screenerResults, [screenerType]: (screenerResults[screenerType] || []).filter(t => t !== ticker) };
+    setScreenerResults(next);
+    saveData(SCREENER_KEY, next);
+  };
+
   const checkedCount = Object.values(checks).filter(Boolean).length;
   const score = Math.round((checkedCount / 10) * 100);
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans pb-24">
-      <header className="max-w-4xl mx-auto mb-8 flex justify-between items-center border-b border-gray-200 pb-6">
+      <header className="max-w-4xl mx-auto mb-8 flex justify-between items-center border-b border-gray-200 pb-6 gap-3">
         <div>
-          <p className="text-blue-600 font-bold text-xs md:text-sm tracking-wider">PRIVATE · THIS DEVICE ONLY</p>
-          <h1 className="text-xl md:text-3xl font-extrabold text-gray-900 mt-1">📝 매매일지 & 종목 진단</h1>
-          <p className="text-gray-500 text-xs md:text-sm mt-1">
-            매매일지는 이 브라우저(기기)에만 저장돼요. 다른 사람은 볼 수 없어요.
+          <p className="text-blue-600 font-bold text-xs md:text-sm tracking-wider">STOCK INVESTING</p>
+          <h1 className="text-xl md:text-3xl font-extrabold text-gray-900 mt-1">📝 개별주 투자</h1>
+          <p className="text-gray-500 text-xs md:text-sm mt-1 break-keep">
+            로그인하지 않으면 이 브라우저(기기)에만 저장돼요. 구글 로그인을 하면 다른 기기에서도 같은 기록을 볼 수 있고, 내 계정에만 저장돼요.
           </p>
         </div>
-        <Link href="/" className="bg-gray-200 text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm hover:bg-gray-300 transition shrink-0">← 메인으로</Link>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <Link href="/" className="bg-gray-200 text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm hover:bg-gray-300 transition">← 메인으로</Link>
+          <AuthButton />
+        </div>
       </header>
 
       <main className="max-w-4xl mx-auto flex flex-col gap-6">
@@ -348,10 +455,38 @@ export default function JournalPage() {
           <button onClick={() => setActiveTab('journal')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'journal' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📝 매매일지</button>
           <button onClick={() => setActiveTab('checklist')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'checklist' ? 'bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>✅ 종목 진단</button>
           <button onClick={() => setActiveTab('weekly')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'weekly' ? 'bg-gradient-to-r from-emerald-700 to-teal-800 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>📊 주간데이터</button>
+          <button onClick={() => setActiveTab('screener')} className={`px-3 py-2 md:px-4 rounded-lg font-bold text-xs md:text-sm transition-all shrink-0 ${activeTab === 'screener' ? 'bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>🔍 스크리너</button>
         </div>
 
         {activeTab === 'journal' && (
           <>
+            {/* AI에게 최근 2년 뉴스 흐름 물어보기 */}
+            <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col gap-4">
+              <div>
+                <h3 className="font-extrabold text-gray-900 text-base md:text-lg">🤖 AI에게 최근 2년 뉴스 흐름 물어보기</h3>
+                <p className="text-xs md:text-sm text-gray-500 mt-1 break-keep">아래 프롬프트를 복사해서 ChatGPT, Claude, Gemini 등 평소 쓰는 AI에 그대로 붙여넣어 보세요. 기업명(티커)을 아래에 적으면 프롬프트에 자동으로 들어가요.</p>
+              </div>
+              <input
+                type="text"
+                value={promptCompany}
+                onChange={(e) => setPromptCompany(e.target.value)}
+                placeholder="기업명 또는 티커 (선택, 예: HON)"
+                className="w-full border border-gray-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-black font-semibold transition"
+              />
+              <div className="bg-[#1f2128] text-white rounded-xl p-4 md:p-5 text-xs md:text-sm leading-relaxed font-semibold flex flex-col gap-1.5 break-keep">
+                <p><span className="inline-block min-w-[3.5rem] bg-amber-400 text-black font-black px-1.5 rounded text-center">{promptCompany.trim() || '\u00A0'}</span>의 최근 2년간 주요 뉴스 흐름을 분석해 줘.</p>
+                {buildNewsPrompt('x').split('\n').slice(1).map((line, i) => <p key={i}>{line}</p>)}
+              </div>
+              <button onClick={handleCopyPrompt} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-3 rounded-xl transition shadow-sm text-sm">
+                {promptCopied ? '✅ 복사됐어요!' : '프롬프트 복사하기'}
+              </button>
+              <div className="grid grid-cols-3 gap-2">
+                <a href="https://chatgpt.com/" target="_blank" rel="noreferrer" className="text-center border border-gray-200 rounded-xl py-2.5 text-xs md:text-sm font-bold text-gray-800 hover:bg-gray-50 transition">ChatGPT 열기</a>
+                <a href="https://claude.ai/new" target="_blank" rel="noreferrer" className="text-center border border-gray-200 rounded-xl py-2.5 text-xs md:text-sm font-bold text-gray-800 hover:bg-gray-50 transition">Claude 열기</a>
+                <a href="https://gemini.google.com/app" target="_blank" rel="noreferrer" className="text-center border border-gray-200 rounded-xl py-2.5 text-xs md:text-sm font-bold text-gray-800 hover:bg-gray-50 transition">Gemini 열기</a>
+              </div>
+            </div>
+
             {/* 요약 카드 */}
             <div className="bg-black text-white p-6 rounded-2xl shadow-md flex flex-col sm:flex-row justify-between gap-4">
               <div>
@@ -612,13 +747,25 @@ export default function JournalPage() {
             <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
               {/* 1~9번 일반 체크리스트 항목 */}
               {CHECKLIST_DATA.map((item) => (
-                <label key={item.id} className={`flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl border cursor-pointer transition ${checks[item.id] ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-transparent hover:bg-gray-100'}`}>
+                <div key={item.id} className="flex flex-col gap-2">
+                <label className={`flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl border cursor-pointer transition ${checks[item.id] ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-transparent hover:bg-gray-100'}`}>
                   <input type="checkbox" checked={checks[item.id]} onChange={(e) => setChecks({...checks, [item.id]: e.target.checked})} className="mt-1 w-5 h-5 accent-indigo-600 shrink-0 cursor-pointer" />
                   <div className="flex flex-col">
                     <span className={`text-sm md:text-base font-bold transition ${checks[item.id] ? 'text-indigo-900' : 'text-gray-800'}`}>{item.title}</span>
                     <span className="text-[11px] md:text-xs text-gray-500 mt-1 leading-relaxed break-keep">{item.desc}</span>
                   </div>
                 </label>
+                {item.id === 'q4' && (
+                  <div className="px-3 md:px-4">
+                    <button type="button" onClick={() => setShowDividendGuide(!showDividendGuide)} className="text-[11px] md:text-xs font-bold text-indigo-600 hover:text-indigo-800 transition">
+                      {showDividendGuide ? '배당수익률 확인법 접기 ▴' : '배당수익률 확인법 자세히보기 ▾'}
+                    </button>
+                    {showDividendGuide && (
+                      <img src="/images/dividend-yield-guide.png" alt="배당수익률 확인법: 키움증권 MTS 배당탭, stockanalysis.com Financials → Ratios의 Dividend Yield" className="mt-2 w-full max-w-md rounded-xl border border-gray-200" />
+                    )}
+                  </div>
+                )}
+                </div>
               ))}
 
               {/* 10번 자동 계산 체크리스트 */}
@@ -721,6 +868,84 @@ export default function JournalPage() {
                 {score >= 50 && score < 80 && "기준의 절반 정도만 통과했습니다. 현재 밸류에이션 등 핵심 지표가 매력적이지 않습니다."}
                 {score < 50 && "치명적인 리스크가 너무 많습니다. 소중한 자산을 보호하기 위해 매수를 보류하세요."}
               </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'screener' && (
+          <div className="flex flex-col gap-6">
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries(SCREENER_PRESETS).map(([key, preset]) => (
+                <button key={key} onClick={() => setScreenerType(key)} className={`rounded-xl border p-3 text-center transition ${screenerType === key ? 'bg-orange-50 border-orange-300' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                  <span className={`block text-sm md:text-base font-black ${screenerType === key ? 'text-orange-600' : 'text-gray-700'}`}>{preset.label}</span>
+                  <span className="block text-[11px] text-gray-400 font-bold mt-0.5">필터 {preset.filters.length}개</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 border-l-4 border-l-orange-400">
+              <h3 className="font-black text-gray-900 text-base md:text-lg">{SCREENER_PRESETS[screenerType].label} — {SCREENER_PRESETS[screenerType].title}</h3>
+              <p className="text-xs md:text-sm text-gray-600 mt-1.5 break-keep">{SCREENER_PRESETS[screenerType].desc}</p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 border-l-4 border-l-orange-400 flex flex-col gap-3">
+              <h3 className="font-black text-gray-900 text-base md:text-lg">① 스크리너 열기</h3>
+              <a href="https://stockanalysis.com/stocks/screener/" target="_blank" rel="noreferrer" className="flex justify-between items-center border border-gray-200 rounded-xl p-3 hover:bg-gray-50 transition">
+                <div>
+                  <p className="font-black text-sm text-gray-900">Stockanalysis.com Stock Screener</p>
+                  <p className="text-[11px] text-gray-400 font-semibold mt-0.5">stockanalysis.com → 상단 Screener → Stock Screener</p>
+                </div>
+                <span className="text-xs font-black text-orange-500 shrink-0 ml-2">열기 ↗</span>
+              </a>
+              <ol className="text-xs md:text-sm text-gray-700 font-semibold flex flex-col gap-2 break-keep">
+                <li><span className="inline-block w-5 h-5 rounded-full bg-black text-white text-[11px] text-center leading-5 mr-2">1</span>스크리너 화면에서 <code className="bg-gray-100 border border-gray-200 rounded px-1.5">Add Filters</code> (필터 추가) 버튼을 눌러요</li>
+                <li><span className="inline-block w-5 h-5 rounded-full bg-black text-white text-[11px] text-center leading-5 mr-2">2</span>검색창에 아래 표의 필터 이름(영문)을 그대로 입력해 찾아요</li>
+                <li><span className="inline-block w-5 h-5 rounded-full bg-black text-white text-[11px] text-center leading-5 mr-2">3</span>체크한 필터에 조건(예: <code className="bg-gray-100 border border-gray-200 rounded px-1.5">Over 15%</code>)을 넣어요</li>
+              </ol>
+              <p className="text-[11px] text-gray-400 font-medium break-keep">필터는 투자 종목을 확정하는 게 아니라, 부적합한 후보를 걸러내는 과정이에요. 조건을 지나치게 엄격하게 잡을 필요는 없어요.</p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 border-l-4 border-l-orange-400 flex flex-col gap-3">
+              <h3 className="font-black text-gray-900 text-base md:text-lg">② {SCREENER_PRESETS[screenerType].label} 기준 {SCREENER_PRESETS[screenerType].filters.length}개</h3>
+              <div className="flex flex-col gap-2">
+                {SCREENER_PRESETS[screenerType].filters.map((f, idx) => (
+                  <div key={f.name} className="border border-gray-200 rounded-xl p-3 flex gap-3 items-start">
+                    <span className="w-6 h-6 shrink-0 rounded-full bg-gray-100 text-gray-500 text-[11px] font-black flex items-center justify-center">{idx + 1}</span>
+                    <div>
+                      <p className="text-[10px] text-gray-400 font-bold">{f.group}</p>
+                      <p className="font-black text-sm md:text-base text-gray-900">{f.name}</p>
+                      <span className="inline-block mt-1 text-[11px] md:text-xs font-black text-orange-600 bg-orange-50 rounded-md px-2 py-0.5">{f.value}</span>
+                      {f.note && <p className="text-[11px] text-gray-400 font-medium mt-1">{f.note}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 border-l-4 border-l-orange-400 flex flex-col gap-3">
+              <h3 className="font-black text-gray-900 text-base md:text-lg">③ 스크리닝 결과 기록하기 <span className="text-xs text-gray-400 font-bold">({SCREENER_PRESETS[screenerType].label})</span></h3>
+              <p className="text-xs font-bold text-gray-500">결과 목록에서 눈에 띄는 종목 적기</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={screenerInput}
+                  onChange={(e) => setScreenerInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddScreenerTickers(); } }}
+                  placeholder="티커 또는 기업명 (예: MSFT)"
+                  className="flex-1 min-w-0 border border-gray-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-black font-semibold transition"
+                />
+                <button onClick={handleAddScreenerTickers} className="bg-black text-white font-black px-4 rounded-xl text-sm hover:bg-gray-800 transition shrink-0">추가</button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(screenerResults[screenerType] || []).map((t) => (
+                  <span key={t} className="inline-flex items-center gap-1.5 bg-white border border-gray-300 rounded-full pl-3 pr-2 py-1 text-xs md:text-sm font-black text-gray-800">
+                    {t}
+                    <button onClick={() => handleRemoveScreenerTicker(t)} className="text-gray-400 hover:text-red-500 transition leading-none" aria-label={`${t} 삭제`}>✕</button>
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs font-bold text-emerald-600">{(screenerResults[screenerType] || []).length > 0 ? `✓ ${(screenerResults[screenerType] || []).length}개 기록했어요` : '아직 기록한 종목이 없어요'}</p>
+              <p className="text-[11px] text-gray-400 font-medium">쉼표로 여러 개를 한 번에 넣어도 돼요. (예: MSFT, GOOGL, META) 로그인하지 않으면 이 기기에만 저장돼요.</p>
             </div>
           </div>
         )}

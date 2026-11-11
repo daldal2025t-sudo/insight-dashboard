@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import AuthButton from '../components/AuthButton';
+import { saveData } from '../lib/cloudSync';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
 // 섹터 ETF 티커 → 앱 내부 섹터 키
@@ -83,7 +85,8 @@ export default function ArchivePage() {
       });
   };
 
-  useEffect(() => {
+  // 이 기기(localStorage)에 저장된 값을 화면 상태로 불러온다. (구글 로그인 동기화가 끝나면 다시 호출됨)
+  const loadLocalState = () => {
     const savedTabLists = localStorage.getItem('kijay_tab_configurations');
     if (savedTabLists) { 
       try { 
@@ -102,7 +105,11 @@ export default function ArchivePage() {
     if (savedCustomTickers) {
       try { initialCustomTickers = JSON.parse(savedCustomTickers); setCustomTickers(initialCustomTickers); } catch (e) {}
     }
+    return initialCustomTickers;
+  };
 
+  useEffect(() => {
+    const initialCustomTickers = loadLocalState();
     fetchMasterPool(initialCustomTickers).finally(() => setIsLoading(false));
 
     fetch('/api/stocks')
@@ -117,6 +124,13 @@ export default function ArchivePage() {
         }
       })
       .catch(err => console.error('환율 연동 실패:', err));
+  }, []);
+
+  // 구글 로그인 동기화가 끝나면(다른 기기에서 저장한 값이 들어왔을 수 있음) 다시 읽어온다
+  useEffect(() => {
+    const onCloudSync = () => { const tickers = loadLocalState(); fetchMasterPool(tickers); };
+    window.addEventListener('cloud-sync-complete', onCloudSync);
+    return () => window.removeEventListener('cloud-sync-complete', onCloudSync);
   }, []);
 
   // 리밸런싱 탭을 처음 열 때만 섹터별 ETF 수익률을 조회 (서버에서 7일 캐싱됨)
@@ -146,14 +160,14 @@ export default function ArchivePage() {
     const updatedTabList = tabLists[tab].map(item => item.code === code ? { ...item, weight: textValue } : item);
     const nextState = { ...tabLists, [tab]: updatedTabList };
     setTabLists(nextState);
-    localStorage.setItem('kijay_tab_configurations', JSON.stringify(nextState));
+    saveData('kijay_tab_configurations', nextState);
   };
 
   const handleQtyChange = (code, val) => {
     const num = val === '' ? '' : Math.max(0, parseInt(val) || 0);
     const updated = { ...quantities, [code]: num };
     setQuantities(updated);
-    localStorage.setItem('kijay_etf_counts_v2', JSON.stringify(updated));
+    saveData('kijay_etf_counts_v2', updated);
   };
 
   const handleAddStockToTab = (code) => {
@@ -165,7 +179,7 @@ export default function ArchivePage() {
     const updatedTabList = [...(tabLists[targetTab] || []), { code, weight: '0%' }];
     const nextState = { ...tabLists, [targetTab]: updatedTabList };
     setTabLists(nextState);
-    localStorage.setItem('kijay_tab_configurations', JSON.stringify(nextState));
+    saveData('kijay_tab_configurations', nextState);
     setSearchQuery('');
     setIsDropdownOpen(false);
   };
@@ -184,7 +198,7 @@ export default function ArchivePage() {
 
     const nextCustomTickers = customTickers.includes(raw) ? customTickers : [...customTickers, raw];
     setCustomTickers(nextCustomTickers);
-    localStorage.setItem('kijay_custom_etfs', JSON.stringify(nextCustomTickers));
+    saveData('kijay_custom_etfs', nextCustomTickers);
 
     fetchMasterPool(nextCustomTickers)
       .then(() => {
@@ -205,7 +219,7 @@ export default function ArchivePage() {
       const updatedTabList = [...tabLists.myassets, { code, weight: '0%' }];
       const nextState = { ...tabLists, myassets: updatedTabList };
       setTabLists(nextState);
-      localStorage.setItem('kijay_tab_configurations', JSON.stringify(nextState));
+      saveData('kijay_tab_configurations', nextState);
       alert('✅ 성공적으로 [💰 내 자산] 탭에 편입되었습니다!');
     } else {
       alert('⚠️ 이미 내 자산에 편입된 종목입니다.');
@@ -216,7 +230,7 @@ export default function ArchivePage() {
     const updatedTabList = tabLists[tab].filter(item => item.code !== code);
     const nextState = { ...tabLists, [tab]: updatedTabList };
     setTabLists(nextState);
-    localStorage.setItem('kijay_tab_configurations', JSON.stringify(nextState));
+    saveData('kijay_tab_configurations', nextState);
   };
 
   const handleMoveOrder = (tab, index, direction) => {
@@ -227,7 +241,7 @@ export default function ArchivePage() {
     [currentList[index], currentList[targetIdx]] = [currentList[targetIdx], currentList[index]];
     const nextState = { ...tabLists, [tab]: currentList };
     setTabLists(nextState);
-    localStorage.setItem('kijay_tab_configurations', JSON.stringify(nextState));
+    saveData('kijay_tab_configurations', nextState);
   };
 
   const filteredSearchPool = masterPool.filter(item => 
@@ -364,15 +378,18 @@ export default function ArchivePage() {
   const currentCycleData = cycleDefinitions[cyclePhase];
 
   // 📊 1단계: 섹터 ETF 별 1년/5년/10년 수익률과 단기−장기 차이. 1년−10년 상위 3개 = 축소 후보, 하위 3개 = 확대 후보.
-  // (10년 데이터가 없는 섹터는 순위에서 제외, 기초소재·에너지·부동산은 확대 후보에서 제외)
+  // (상장 10년 미만 섹터는 상장 이후 기간 기준으로 계산, 기초소재·에너지·부동산은 확대 후보에서 제외)
   const sectorMetricRows = sectorPerf ? sectorPerf.map((s) => {
-    const has10y = s.longTermCagr != null && s.dataYears != null && s.dataYears >= 9.5;
+    // 장기 값: 10년 데이터가 있으면 10년, 상장 10년 미만이면(통신서비스 등) 상장 이후 기간 기준(5년 이상일 때만)
+    const hasLong = s.longTermCagr != null && s.dataYears != null && s.dataYears >= 5;
+    const months = s.dataMonths ?? Math.round((s.dataYears || 0) * 12);
     return {
       ...s,
       key: SECTOR_ETF_KEY[s.symbol],
-      cagr10y: has10y ? s.longTermCagr : null,
+      cagr10y: hasLong ? s.longTermCagr : null,
+      shortPeriodNote: hasLong && s.dataYears < 9.5 ? `${Math.floor(months / 12)}년 ${months % 12}개월 기준` : null,
       gap5: s.oneYearReturn != null && s.fiveYearCagr != null ? s.oneYearReturn - s.fiveYearCagr : null,
-      gap10: s.oneYearReturn != null && has10y ? s.oneYearReturn - s.longTermCagr : null,
+      gap10: s.oneYearReturn != null && hasLong ? s.oneYearReturn - s.longTermCagr : null,
       shrinkCandidate: false,
       expandCandidate: false,
     };
@@ -397,7 +414,7 @@ export default function ArchivePage() {
     ranked.slice(0, 3).forEach(r => { r.cycleScore = 1; });
     ranked.slice(-3).forEach(r => { r.cycleScore = -1; });
     rows.forEach(r => { r.total = r.gapScore + r.cycleScore; });
-    sectorScoreRows = rows.sort((a, b) => b.total - a.total);
+    sectorScoreRows = rows; // 1단계 표와 같은 섹터 순서 유지
   }
   const overweightKeys = sectorScoreRows ? sectorScoreRows.filter(r => r.total > 0).map(r => r.key) : [];
   const underweightKeys = sectorScoreRows ? sectorScoreRows.filter(r => r.total < 0).map(r => r.key) : [];
@@ -583,8 +600,11 @@ export default function ArchivePage() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans pb-24">
       <header className="max-w-5xl mx-auto mb-8 flex justify-between items-center border-b border-gray-200 pb-6">
-        <div><p className="text-blue-600 font-bold text-xs md:text-sm tracking-wider">PORTFOLIO BUILDER Master</p><h1 className="text-xl md:text-3xl font-extrabold text-gray-900 mt-1">ETF 포트폴리오 빌더</h1></div>
-        <Link href="/" className="bg-gray-200 text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm hover:bg-gray-300 transition shrink-0">← 메인으로</Link>
+        <div><p className="text-blue-600 font-bold text-xs md:text-sm tracking-wider">ETF INVESTING Master</p><h1 className="text-xl md:text-3xl font-extrabold text-gray-900 mt-1">ETF투자</h1></div>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <Link href="/" className="bg-gray-200 text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm hover:bg-gray-300 transition">← 메인으로</Link>
+          <AuthButton />
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto">
@@ -752,7 +772,7 @@ export default function ArchivePage() {
                             <td className="py-2 pr-2 font-bold text-gray-800">{s.label}<span className="block text-[9px] font-semibold text-gray-400">{s.symbol}</span></td>
                             <td className="py-2 pr-2 text-right font-semibold text-gray-700">{fmtNum(s.oneYearReturn)}%</td>
                             <td className="py-2 pr-2 text-right font-semibold text-gray-700">{fmtNum(s.fiveYearCagr)}%</td>
-                            <td className="py-2 pr-2 text-right font-semibold text-gray-700">{fmtNum(s.cagr10y)}%</td>
+                            <td className="py-2 pr-2 text-right font-semibold text-gray-700">{fmtNum(s.cagr10y)}%{s.shortPeriodNote && <span className="block text-[9px] font-medium text-gray-400">({s.shortPeriodNote})</span>}</td>
                             <td className="py-2 pr-2 text-right font-black text-orange-500">{s.gap5 == null ? '–' : `${fmtSigned(s.gap5)}%p`}</td>
                             <td className="py-2 pr-2 text-right font-black text-orange-500">{s.gap10 == null ? '–' : `${fmtSigned(s.gap10)}%p`}</td>
                             <td className="py-2 pr-2 text-center font-black text-orange-500">{s.shrinkCandidate ? '✓' : ''}</td>
@@ -762,7 +782,7 @@ export default function ArchivePage() {
                       </tbody>
                     </table>
                     <p className="text-[10px] text-gray-400 font-medium mt-3 break-keep">
-                      * 5년·10년은 연평균 수익률이에요. 상장 10년 미만인 섹터(통신서비스)는 10년 값이 없어 순위에서 제외했어요.<br />
+                      * 5년·10년은 연평균 수익률이에요. 상장 10년 미만인 섹터(통신서비스)는 상장 이후 기간 기준으로 계산했고, 값 아래에 기준 기간을 작게 표시했어요.<br />
                       * 기초소재·에너지·부동산은 확대 후보에 들어와도 변동성을 고려해 최종 확대 후보로 선정하지 않아요(회색 칸).
                     </p>
                   </div>

@@ -270,10 +270,10 @@ export default function Home() {
             📈 무매&VR →
           </Link>
           <Link href="/archive" className="bg-black text-white px-5 py-2.5 rounded-full font-bold text-xs md:text-sm hover:bg-gray-800 transition shadow-md flex items-center gap-1">
-            📚 포트폴리오 빌더 →
+            📚 ETF투자 →
           </Link>
           <Link href="/journal" className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-2.5 rounded-full font-bold text-xs md:text-sm hover:opacity-90 transition shadow-md flex items-center gap-1">
-            📝 매매일지 →
+            📝 개별주 투자 →
           </Link>
         </div>
       </header>
