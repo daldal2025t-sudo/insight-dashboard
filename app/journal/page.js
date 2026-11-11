@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import AuthButton from '../components/AuthButton';
+import CloudSyncInit from '../components/CloudSyncInit';
 import { saveData } from '../lib/cloudSync';
 
 const STORAGE_KEY = 'kijay_trade_journal';
@@ -446,7 +446,7 @@ export default function JournalPage() {
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
           <Link href="/" className="bg-gray-200 text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm hover:bg-gray-300 transition">← 메인으로</Link>
-          <AuthButton />
+          <CloudSyncInit />
         </div>
       </header>
 

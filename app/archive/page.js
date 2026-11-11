@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import AuthButton from '../components/AuthButton';
+import CloudSyncInit from '../components/CloudSyncInit';
 import { saveData } from '../lib/cloudSync';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
@@ -603,7 +603,7 @@ export default function ArchivePage() {
         <div><p className="text-blue-600 font-bold text-xs md:text-sm tracking-wider">ETF INVESTING Master</p><h1 className="text-xl md:text-3xl font-extrabold text-gray-900 mt-1">ETF투자</h1></div>
         <div className="flex flex-col items-end gap-2 shrink-0">
           <Link href="/" className="bg-gray-200 text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm hover:bg-gray-300 transition">← 메인으로</Link>
-          <AuthButton />
+          <CloudSyncInit />
         </div>
       </header>
 
