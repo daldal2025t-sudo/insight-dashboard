@@ -444,6 +444,9 @@ export default function JournalPage() {
     }
   }, [fairPrice, isUndervalued, currentPerVal, growthVal, currentPriceVal]);
 
+  // 스크리너 탭에 기록한 종목들(대형우량주 + 고성장주, 중복 제거) — 뉴스/사업구조 프롬프트 입력칸 위에 칩으로 보여줌
+  const screenerTickerChips = [...new Set([...(screenerResults.blue || []), ...(screenerResults.growth || [])])];
+
   // ===== AI 프롬프트 복사 =====
   const handleCopyPrompt = (kind) => {
     copyTextToClipboard(
@@ -502,10 +505,24 @@ export default function JournalPage() {
           <>
             {/* AI에게 최근 2년 뉴스 흐름 물어보기 */}
             <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col gap-4">
-              <div>
-                <h3 className="font-extrabold text-gray-900 text-base md:text-lg">🤖 AI에게 최근 2년 뉴스 흐름 물어보기</h3>
-                <p className="text-xs md:text-sm text-gray-500 mt-1 break-keep">아래 프롬프트를 복사해서 ChatGPT, Claude, Gemini 등 평소 쓰는 AI에 그대로 붙여넣어 보세요. 기업명(티커)을 아래에 적으면 두 프롬프트에 자동으로 들어가요. 각 박스 오른쪽 위 아이콘을 누르면 복사돼요.</p>
-              </div>
+              {/* 스크리너 탭에서 기록한 종목: 누르면 아래 입력칸에 채워져요 */}
+              {screenerTickerChips.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-[11px] font-bold text-gray-400">🔍 스크리너에서 고른 종목 (누르면 입력돼요)</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {screenerTickerChips.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setPromptCompany(t)}
+                        className={`px-3 py-1 rounded-full border text-xs font-black transition ${promptCompany.trim().toUpperCase() === t.toUpperCase() ? 'bg-orange-500 border-orange-500 text-white' : 'bg-white border-gray-300 text-gray-700 hover:border-orange-400 hover:text-orange-600'}`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <input
                 type="text"
                 value={promptCompany}
@@ -513,6 +530,10 @@ export default function JournalPage() {
                 placeholder="기업명 또는 티커 (선택, 예: HON)"
                 className="w-full border border-gray-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-black font-semibold transition"
               />
+              <div>
+                <h3 className="font-extrabold text-gray-900 text-base md:text-lg">🤖 AI에게 최근 2년 뉴스 흐름 물어보기</h3>
+                <p className="text-xs md:text-sm text-gray-500 mt-1 break-keep">기업명(티커)을 적으면 두 프롬프트에 자동으로 들어가요. 각 박스 오른쪽 위 아이콘을 누르면 복사돼요.</p>
+              </div>
               {/* 최근 2년 뉴스 흐름 프롬프트 (어두운 박스, 우측 상단 복사 아이콘) */}
               <div className="relative bg-[#1f2128] text-white rounded-xl p-4 md:p-5 pr-12 md:pr-14 text-xs md:text-sm leading-relaxed font-semibold flex flex-col gap-1.5 break-keep">
                 <CopyIconButton onClick={() => handleCopyPrompt('news')} copied={copiedKey === 'news'} label="뉴스 흐름 프롬프트 복사" />
@@ -523,32 +544,20 @@ export default function JournalPage() {
               {/* AI 사업구조 파악하기 프롬프트 (밝은 박스, 우측 상단 복사 아이콘) */}
               <div className="flex flex-col gap-2">
                 <h4 className="font-extrabold text-gray-900 text-sm md:text-base">🧩 AI 사업구조 파악하기</h4>
-                <div className="relative bg-white border border-gray-300 text-gray-800 rounded-xl p-4 md:p-5 pr-12 md:pr-14 text-xs md:text-sm leading-relaxed font-semibold flex flex-col gap-1.5 break-keep">
+                <div className="relative bg-[#1f2128] text-white rounded-xl p-4 md:p-5 pr-12 md:pr-14 text-xs md:text-sm leading-relaxed font-semibold flex flex-col gap-1.5 break-keep">
                   <CopyIconButton onClick={() => handleCopyPrompt('biz')} copied={copiedKey === 'biz'} label="사업구조 프롬프트 복사" />
-                  <p className="font-black text-gray-900">AI 프롬프트:</p>
-                  <p><span className="inline-block min-w-[3.5rem] bg-amber-200 text-black font-black px-1.5 rounded text-center">{promptCompany.trim() || '\u00A0'}</span>{josaEulReul(promptCompany)} 3분 안에 이해할 수 있도록 사업 구조를 중심으로 쉽고 간결하게 요약해 줘.</p>
+                  <p><span className="inline-block min-w-[3.5rem] bg-amber-400 text-black font-black px-1.5 rounded text-center">{promptCompany.trim() || '\u00A0'}</span>{josaEulReul(promptCompany)} 3분 안에 이해할 수 있도록 사업 구조를 중심으로 쉽고 간결하게 요약해 줘.</p>
                   {BUSINESS_PROMPT_REST.map((line, i) => <p key={i}>{line}</p>)}
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
-                <a href="https://chatgpt.com/" target="_blank" rel="noreferrer" className="text-center border border-gray-200 rounded-xl py-2.5 text-xs md:text-sm font-bold text-gray-800 hover:bg-gray-50 transition">ChatGPT 열기</a>
-                <a href="https://claude.ai/new" target="_blank" rel="noreferrer" className="text-center border border-gray-200 rounded-xl py-2.5 text-xs md:text-sm font-bold text-gray-800 hover:bg-gray-50 transition">Claude 열기</a>
-                <a href="https://gemini.google.com/app" target="_blank" rel="noreferrer" className="text-center border border-gray-200 rounded-xl py-2.5 text-xs md:text-sm font-bold text-gray-800 hover:bg-gray-50 transition">Gemini 열기</a>
+                <a href="https://chatgpt.com/" target="_blank" rel="noreferrer" className="text-center bg-orange-500 hover:bg-orange-600 text-white rounded-xl py-2.5 text-xs md:text-sm font-black shadow-sm transition">ChatGPT 열기</a>
+                <a href="https://claude.ai/new" target="_blank" rel="noreferrer" className="text-center bg-orange-500 hover:bg-orange-600 text-white rounded-xl py-2.5 text-xs md:text-sm font-black shadow-sm transition">Claude 열기</a>
+                <a href="https://gemini.google.com/app" target="_blank" rel="noreferrer" className="text-center bg-orange-500 hover:bg-orange-600 text-white rounded-xl py-2.5 text-xs md:text-sm font-black shadow-sm transition">Gemini 열기</a>
               </div>
             </div>
 
-            {/* 요약 카드 */}
-            <div className="bg-black text-white p-6 rounded-2xl shadow-md flex flex-col sm:flex-row justify-between gap-4">
-              <div>
-                <p className="text-gray-400 text-xs font-bold tracking-wider">총 기록 건수</p>
-                <p className="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">{entries.length}<span className="text-sm font-normal text-gray-400 ml-1">건</span></p>
-              </div>
-              <div>
-                <p className="text-gray-400 text-xs font-bold tracking-wider">수량 입력된 총 매수 금액</p>
-                <p className="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">{totalInvested.toLocaleString('ko-KR')}</p>
-              </div>
-            </div>
 
             {/* 입력 폼 */}
             <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col gap-4">
@@ -634,6 +643,18 @@ export default function JournalPage() {
                 </button>
               </div>
             </form>
+
+            {/* 요약 카드 */}
+            <div className="bg-black text-white p-6 rounded-2xl shadow-md flex flex-col sm:flex-row justify-between gap-4">
+              <div>
+                <p className="text-gray-400 text-xs font-bold tracking-wider">총 기록 건수</p>
+                <p className="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">{entries.length}<span className="text-sm font-normal text-gray-400 ml-1">건</span></p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs font-bold tracking-wider">수량 입력된 총 매수 금액</p>
+                <p className="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">{totalInvested.toLocaleString('ko-KR')}</p>
+              </div>
+            </div>
 
             {/* 검색 + 시세 새로고침 */}
             <div className="flex gap-2">
