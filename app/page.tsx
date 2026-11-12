@@ -274,7 +274,7 @@ export default function Home() {
             📚 ETF투자 →
           </Link>
           <Link href="/journal" className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-2.5 rounded-full font-bold text-xs md:text-sm hover:opacity-90 transition shadow-md flex items-center gap-1">
-            📝 개별주 투자 →
+            📝 100배주 →
           </Link>
           <AuthButton />
         </div>

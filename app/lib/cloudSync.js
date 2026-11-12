@@ -8,8 +8,8 @@ import { auth, db, isFirebaseConfigured } from './firebase';
 
 // 동기화 대상 localStorage 키
 export const SYNC_KEYS = [
-  'kijay_trade_journal',      // 개별주 투자: 매매일지
-  'kijay_screener_results',   // 개별주 투자: 스크리너 결과
+  'kijay_trade_journal',      // 100배주: 매매일지
+  'kijay_screener_results',   // 100배주: 스크리너 결과
   'kijay_tab_configurations', // ETF투자: 탭별 보유/모델 구성
   'kijay_etf_counts_v2',      // ETF투자: 보유 수량
   'kijay_custom_etfs',        // ETF투자: 직접 추가한 티커

@@ -481,11 +481,8 @@ export default function JournalPage() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans pb-24">
       <header className="max-w-4xl mx-auto mb-8 flex justify-between items-center border-b border-gray-200 pb-6 gap-3">
         <div>
-          <p className="text-blue-600 font-bold text-xs md:text-sm tracking-wider">STOCK INVESTING</p>
-          <h1 className="text-xl md:text-3xl font-extrabold text-gray-900 mt-1">📝 개별주 투자</h1>
-          <p className="text-gray-500 text-xs md:text-sm mt-1 break-keep">
-            로그인하지 않으면 이 브라우저(기기)에만 저장돼요. 구글 로그인을 하면 다른 기기에서도 같은 기록을 볼 수 있고, 내 계정에만 저장돼요.
-          </p>
+          <p className="text-blue-600 font-bold text-xs md:text-sm tracking-wider">100X STOCKS</p>
+          <h1 className="text-xl md:text-3xl font-extrabold text-gray-900 mt-1">📝 100배주</h1>
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
           <Link href="/" className="bg-gray-200 text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm hover:bg-gray-300 transition">← 메인으로</Link>
