@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import CloudSyncInit from '../components/CloudSyncInit';
 import { saveData } from '../lib/cloudSync';
@@ -173,6 +173,7 @@ export default function JournalPage() {
   const [entries, setEntries] = useState([]);
   const [form, setForm] = useState(emptyForm());
   const [editingId, setEditingId] = useState(null);
+  const formRef = useRef(null); // 기록 추가/수정 폼 (수정 버튼을 누르면 여기로 스크롤)
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
   const [priceMap, setPriceMap] = useState({}); // { 'NVDA': { price, currency } }
@@ -326,7 +327,7 @@ export default function JournalPage() {
       quantity: entry.quantity,
       idea: entry.idea,
     });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleDelete = (id) => {
@@ -557,7 +558,7 @@ export default function JournalPage() {
 
 
             {/* 입력 폼 */}
-            <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col gap-4">
+            <form ref={formRef} onSubmit={handleSubmit} className="scroll-mt-4 bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col gap-4">
               <h3 className="font-extrabold text-gray-900 text-sm md:text-base border-b border-gray-50 pb-3">
                 {editingId ? '✏️ 기록 수정' : '➕ 새 매매 기록 추가'}
               </h3>
