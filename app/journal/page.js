@@ -20,6 +20,45 @@ function buildNewsPrompt(company) {
   ].join('\n');
 }
 
+// 한글/영문/숫자 끝 글자에 맞춰 '을' 또는 '를' 선택 (영문 티커는 알파벳 읽는 소리 기준)
+function josaEulReul(name) {
+  const t = (name || '').trim();
+  if (!t) return '을(를)';
+  const ch = t.charAt(t.length - 1);
+  const code = ch.charCodeAt(0);
+  let hasBatchim;
+  if (code >= 0xac00 && code <= 0xd7a3) hasBatchim = (code - 0xac00) % 28 !== 0;
+  else if (/[LMNRlmnr]/.test(ch)) hasBatchim = true;            // 엘, 엠, 엔, 알
+  else if (/[1678]/.test(ch) || ch === '3' || ch === '0') hasBatchim = true; // 일, 육, 칠, 팔, 삼, 영
+  else hasBatchim = false;
+  return hasBatchim ? '을' : '를';
+}
+
+// AI 사업구조 파악하기 프롬프트 (본문 줄들: 첫 줄은 기업명 + 조사 뒤의 문장)
+const BUSINESS_PROMPT_REST = [
+  '① 주력 제품: 무엇을 판매하는 기업인가?',
+  '② 매출 구조: 어떤 제품에서 매출이 발생하는가?',
+  '③ 성장 동력: 앞으로 매출이 증가할 수 있는 이유는?',
+  '④ 핵심 리스크: 기업의 성장을 방해할 수 있는 요인은?',
+];
+function buildBusinessPrompt(company) {
+  const name = company && company.trim() ? company.trim() : '[            ]';
+  return [`${name}${josaEulReul(company)} 3분 안에 이해할 수 있도록 사업 구조를 중심으로 쉽고 간결하게 요약해 줘.`, ...BUSINESS_PROMPT_REST].join('\n');
+}
+
+// 복사 아이콘 버튼 (프롬프트 박스 우측 상단용, 주황색)
+function CopyIconButton({ onClick, copied, label }) {
+  return (
+    <button type="button" onClick={onClick} title={copied ? '복사됐어요!' : label} aria-label={label} className="absolute top-2.5 right-2.5 w-9 h-9 rounded-lg flex items-center justify-center text-orange-500 hover:bg-orange-500/10 active:bg-orange-500/20 transition">
+      {copied ? (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+      ) : (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5" /><path d="M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15" /></svg>
+      )}
+    </button>
+  );
+}
+
 // ===== 스크리너 필터 기준 (stockanalysis.com Stock Screener) =====
 const SCREENER_PRESETS = {
   blue: {
@@ -43,6 +82,7 @@ const SCREENER_PRESETS = {
     label: '🚀 고성장주',
     title: '고성장주란?',
     desc: '연 20~25% 수준의 높은 성장률을 보이는 작고 공격적인 신생 기업',
+    extra: '사업 모델이 단순하고 명확하며, 어떻게 돈을 버는지 이해할 수 있어야 함',
     filters: [
       { group: '거래소', name: 'Exchange', value: 'NASDAQ + NYSE', note: 'NASDAQ과 NYSE 두 곳을 모두 체크해요' },
       { group: '시가총액', name: 'Market Cap Group', value: 'Small Cap + Mid Cap', note: 'Small Cap과 Mid Cap 두 개를 모두 체크해요' },
@@ -159,7 +199,7 @@ export default function JournalPage() {
 
   // ===== AI 뉴스 흐름 프롬프트 카드 상태 =====
   const [promptCompany, setPromptCompany] = useState('');
-  const [promptCopied, setPromptCopied] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(null); // 'news' | 'biz' | null
 
   // ===== 스크리너 탭 상태 =====
   const [screenerType, setScreenerType] = useState('blue');
@@ -405,10 +445,10 @@ export default function JournalPage() {
   }, [fairPrice, isUndervalued, currentPerVal, growthVal, currentPriceVal]);
 
   // ===== AI 프롬프트 복사 =====
-  const handleCopyPrompt = () => {
+  const handleCopyPrompt = (kind) => {
     copyTextToClipboard(
-      buildNewsPrompt(promptCompany),
-      () => { setPromptCopied(true); setTimeout(() => setPromptCopied(false), 2000); },
+      kind === 'biz' ? buildBusinessPrompt(promptCompany) : buildNewsPrompt(promptCompany),
+      () => { setCopiedKey(kind); setTimeout(() => setCopiedKey(null), 2000); },
       () => alert('복사에 실패했어요. 프롬프트를 길게 눌러 직접 복사해 주세요.')
     );
   };
@@ -464,7 +504,7 @@ export default function JournalPage() {
             <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col gap-4">
               <div>
                 <h3 className="font-extrabold text-gray-900 text-base md:text-lg">🤖 AI에게 최근 2년 뉴스 흐름 물어보기</h3>
-                <p className="text-xs md:text-sm text-gray-500 mt-1 break-keep">아래 프롬프트를 복사해서 ChatGPT, Claude, Gemini 등 평소 쓰는 AI에 그대로 붙여넣어 보세요. 기업명(티커)을 아래에 적으면 프롬프트에 자동으로 들어가요.</p>
+                <p className="text-xs md:text-sm text-gray-500 mt-1 break-keep">아래 프롬프트를 복사해서 ChatGPT, Claude, Gemini 등 평소 쓰는 AI에 그대로 붙여넣어 보세요. 기업명(티커)을 아래에 적으면 두 프롬프트에 자동으로 들어가요. 각 박스 오른쪽 위 아이콘을 누르면 복사돼요.</p>
               </div>
               <input
                 type="text"
@@ -473,13 +513,24 @@ export default function JournalPage() {
                 placeholder="기업명 또는 티커 (선택, 예: HON)"
                 className="w-full border border-gray-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-black font-semibold transition"
               />
-              <div className="bg-[#1f2128] text-white rounded-xl p-4 md:p-5 text-xs md:text-sm leading-relaxed font-semibold flex flex-col gap-1.5 break-keep">
+              {/* 최근 2년 뉴스 흐름 프롬프트 (어두운 박스, 우측 상단 복사 아이콘) */}
+              <div className="relative bg-[#1f2128] text-white rounded-xl p-4 md:p-5 pr-12 md:pr-14 text-xs md:text-sm leading-relaxed font-semibold flex flex-col gap-1.5 break-keep">
+                <CopyIconButton onClick={() => handleCopyPrompt('news')} copied={copiedKey === 'news'} label="뉴스 흐름 프롬프트 복사" />
                 <p><span className="inline-block min-w-[3.5rem] bg-amber-400 text-black font-black px-1.5 rounded text-center">{promptCompany.trim() || '\u00A0'}</span>의 최근 2년간 주요 뉴스 흐름을 분석해 줘.</p>
                 {buildNewsPrompt('x').split('\n').slice(1).map((line, i) => <p key={i}>{line}</p>)}
               </div>
-              <button onClick={handleCopyPrompt} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-3 rounded-xl transition shadow-sm text-sm">
-                {promptCopied ? '✅ 복사됐어요!' : '프롬프트 복사하기'}
-              </button>
+
+              {/* AI 사업구조 파악하기 프롬프트 (밝은 박스, 우측 상단 복사 아이콘) */}
+              <div className="flex flex-col gap-2">
+                <h4 className="font-extrabold text-gray-900 text-sm md:text-base">🧩 AI 사업구조 파악하기</h4>
+                <div className="relative bg-white border border-gray-300 text-gray-800 rounded-xl p-4 md:p-5 pr-12 md:pr-14 text-xs md:text-sm leading-relaxed font-semibold flex flex-col gap-1.5 break-keep">
+                  <CopyIconButton onClick={() => handleCopyPrompt('biz')} copied={copiedKey === 'biz'} label="사업구조 프롬프트 복사" />
+                  <p className="font-black text-gray-900">AI 프롬프트:</p>
+                  <p><span className="inline-block min-w-[3.5rem] bg-amber-200 text-black font-black px-1.5 rounded text-center">{promptCompany.trim() || '\u00A0'}</span>{josaEulReul(promptCompany)} 3분 안에 이해할 수 있도록 사업 구조를 중심으로 쉽고 간결하게 요약해 줘.</p>
+                  {BUSINESS_PROMPT_REST.map((line, i) => <p key={i}>{line}</p>)}
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 gap-2">
                 <a href="https://chatgpt.com/" target="_blank" rel="noreferrer" className="text-center border border-gray-200 rounded-xl py-2.5 text-xs md:text-sm font-bold text-gray-800 hover:bg-gray-50 transition">ChatGPT 열기</a>
                 <a href="https://claude.ai/new" target="_blank" rel="noreferrer" className="text-center border border-gray-200 rounded-xl py-2.5 text-xs md:text-sm font-bold text-gray-800 hover:bg-gray-50 transition">Claude 열기</a>
@@ -886,6 +937,7 @@ export default function JournalPage() {
             <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 border-l-4 border-l-orange-400">
               <h3 className="font-black text-gray-900 text-base md:text-lg">{SCREENER_PRESETS[screenerType].label} — {SCREENER_PRESETS[screenerType].title}</h3>
               <p className="text-xs md:text-sm text-gray-600 mt-1.5 break-keep">{SCREENER_PRESETS[screenerType].desc}</p>
+              {SCREENER_PRESETS[screenerType].extra && <p className="text-xs md:text-sm text-gray-600 mt-1.5 break-keep">{SCREENER_PRESETS[screenerType].extra}</p>}
             </div>
 
             <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 border-l-4 border-l-orange-400 flex flex-col gap-3">
