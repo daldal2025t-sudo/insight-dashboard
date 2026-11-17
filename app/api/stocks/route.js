@@ -6,10 +6,10 @@ export async function GET() {
   const symbols = [
     { code: 'ES=F', spotCode: '^GSPC', name: 'S&P 500', type: 'index', showDrawdown: true },
     { code: 'NQ=F', spotCode: '^IXIC', name: 'NASDAQ', type: 'index', showDrawdown: true },
-    { code: 'YM=F', spotCode: '^DJI', name: 'DOW JONES', type: 'index' },
-    { code: 'RTY=F', spotCode: '^RUT', name: 'RUSSELL 2000', type: 'index' },
-    { code: 'TQQQ', spotCode: 'TQQQ', name: 'TQQQ', type: 'etf' },
-    { code: 'SOXL', spotCode: 'SOXL', name: 'SOXL', type: 'etf' },
+    { code: 'YM=F', spotCode: '^DJI', name: 'DOW JONES', type: 'index', showDrawdown: true },
+    { code: 'RTY=F', spotCode: '^RUT', name: 'RUSSELL 2000', type: 'index', showDrawdown: true },
+    { code: 'TQQQ', spotCode: 'TQQQ', name: 'TQQQ', type: 'etf', showDrawdown: true },
+    { code: 'SOXL', spotCode: 'SOXL', name: 'SOXL', type: 'etf', showDrawdown: true },
     { code: '^KS11', spotCode: '^KS11', name: 'KOSPI', type: 'index' },
     { code: '^KQ11', spotCode: '^KQ11', name: 'KOSDAQ', type: 'index' },
 
