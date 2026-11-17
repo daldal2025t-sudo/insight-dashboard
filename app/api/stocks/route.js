@@ -4,8 +4,8 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const symbols = [
-    { code: 'ES=F', spotCode: '^GSPC', name: 'S&P 500', type: 'index' },
-    { code: 'NQ=F', spotCode: '^IXIC', name: 'NASDAQ', type: 'index' },
+    { code: 'ES=F', spotCode: '^GSPC', name: 'S&P 500', type: 'index', showDrawdown: true },
+    { code: 'NQ=F', spotCode: '^IXIC', name: 'NASDAQ', type: 'index', showDrawdown: true },
     { code: 'YM=F', spotCode: '^DJI', name: 'DOW JONES', type: 'index' },
     { code: 'RTY=F', spotCode: '^RUT', name: 'RUSSELL 2000', type: 'index' },
     { code: 'TQQQ', spotCode: 'TQQQ', name: 'TQQQ', type: 'etf' },
@@ -37,6 +37,20 @@ export async function GET() {
     const meta = data?.chart?.result?.[0]?.meta;
     if (!meta) throw new Error(`No meta data found for ${code}`);
     return meta;
+  };
+
+  // 52주 고점 대비 현재가 등락률(%): 최근 1년 일봉 고가의 최댓값 기준, 현재가는 현물 지수 정규장 가격
+  const fetchDrawdownFrom52wHigh = async (code) => {
+    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(code)}?interval=1d&range=1y`;
+    const res = await fetch(url, fetchOptions);
+    if (!res.ok) throw new Error(`52w high fetch failed for ${code}`);
+    const data = await res.json();
+    const result = data?.chart?.result?.[0];
+    const highs = (result?.indicators?.quote?.[0]?.high || []).filter((v) => v != null);
+    const current = result?.meta?.regularMarketPrice;
+    if (highs.length === 0 || !current) throw new Error(`No 52w data for ${code}`);
+    const high = Math.max(...highs, current);
+    return ((current - high) / high) * 100;
   };
 
   const fetchData = async (item) => {
@@ -106,6 +120,15 @@ export async function GET() {
         } catch (e) {}
       }
 
+      // 4. 52주 고점 대비 (S&P 500, NASDAQ만)
+      let drawdownStr = null;
+      if (item.showDrawdown) {
+        try {
+          const dd = Math.round((await fetchDrawdownFrom52wHigh(item.spotCode || item.code)) * 10) / 10;
+          drawdownStr = dd === 0 ? '0.0%' : `${dd > 0 ? '+' : ''}${dd.toFixed(1)}%`;
+        } catch (e) {}
+      }
+
       const displayValue = price > 0 ? (item.code === 'BTC-USD' ? price.toLocaleString('en-US', { maximumFractionDigits: 0 }) : price.toLocaleString('en-US', { maximumFractionDigits: 2 })) : '-';
       
       return {
@@ -116,6 +139,7 @@ export async function GET() {
         isUp: changePercent >= 0,
         spotChange: spotChangeStr,
         isSpotUp: isSpotUp,
+        drawdown: drawdownStr,
         suffix: item.suffix || ''
       };
     } catch (e) {

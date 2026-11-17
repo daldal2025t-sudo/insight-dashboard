@@ -196,7 +196,14 @@ function StockTicker() {
   // 🔥 사용자님의 100% 오리지널 코드! (화살표, 하단 컬러 바, 우측 정렬 모두 원상 복구)
   const renderItem = (item, index) => (
     <div key={index} className="p-3 md:p-4 border-b md:border-b-0 md:border-r border-white flex flex-col justify-between bg-gray-100 hover:bg-gray-200 transition cursor-default">
-      <span className="text-xs md:text-sm font-bold text-gray-800 mb-2 truncate">{item.name}</span>
+      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mb-2 min-w-0">
+        <span className="text-xs md:text-sm font-bold text-gray-800 truncate">{item.name}</span>
+        {item.drawdown && (
+          <span title="최근 52주 고점 대비 현재가 (현물 지수 기준)" className={`shrink-0 text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 rounded border tracking-tighter ${item.drawdown.startsWith('-') ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-pink-50 text-pink-600 border-pink-100'}`}>
+            52주 고점대비 {item.drawdown}
+          </span>
+        )}
+      </div>
       <div className="flex justify-between items-end gap-1">
         <span className="text-sm md:text-base font-extrabold tracking-tighter text-gray-900 leading-none truncate pr-1">
           {item.value}<span className="text-[10px] md:text-xs font-normal ml-0.5 text-gray-500">{item.suffix || ''}</span>
