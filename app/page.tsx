@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import AuthButton from './components/AuthButton';
+import UpcomingEvents from './components/UpcomingEvents';
 
 function NewsCard({ category }) {
   const [news, setNews] = useState([]);
@@ -86,7 +87,7 @@ function NewsCard({ category }) {
   );
 }
 
-// 화면 상단 검정색 "바로가기" 바. 해외주식 기사 사이트는 중요도가 낮은 3개를 "더보기"로 접어둔다.
+// 화면 상단 검정색 "바로가기" 바. 해외주식 기사 사이트 5개는 모두 "더보기"로 접어둔다.
 function QuickLinksSection() {
   const [showMore, setShowMore] = useState(false);
 
@@ -96,10 +97,6 @@ function QuickLinksSection() {
         <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
           <span className="text-red-400 font-bold text-xs bg-red-950/50 px-2 py-0.5 rounded border border-red-900 min-w-[56px] text-center">Global</span>
           <a href="https://www.hankyung.com/globalmarket/1123" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 글로벌마켓</a>
-        </li>
-        <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
-          <span className="text-blue-400 font-bold text-xs bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900 min-w-[56px] text-center">Korea</span>
-          <a href="https://www.hankyung.com/koreamarket/" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">한경 코리안마켓</a>
         </li>
         <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
           <span className="text-pink-400 font-bold text-xs bg-pink-950/50 px-2 py-0.5 rounded border border-pink-900 min-w-[56px] text-center">Index</span>
@@ -120,19 +117,17 @@ function QuickLinksSection() {
           <span className="shrink-0 text-[11px] text-gray-500 font-medium">3·6·9·12월 발표</span>
         </li>
 
-        {/* 🆕 해외주식 기사 사이트: 중요도 높은 2개는 항상 노출 */}
-        <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
-          <span className="text-cyan-400 font-bold text-xs bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-900 min-w-[56px] text-center">FN</span>
-          <a href="https://www.fnnews.com/section/001002000" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">파이낸셜뉴스 국제경제</a>
-        </li>
-        <li className={`flex gap-4 items-center ${showMore ? 'border-b border-gray-900 pb-3' : ''}`}>
-          <span className="text-rose-400 font-bold text-xs bg-rose-950/50 px-2 py-0.5 rounded border border-rose-900 min-w-[56px] text-center">MT</span>
-          <a href="https://www.mt.co.kr/world" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">머니투데이 월드</a>
-        </li>
-
-        {/* 🆕 중요도 낮은 3개: "더보기"를 눌러야 보임 */}
+        {/* 🆕 해외주식 기사 사이트 5개: 모두 "더보기"를 눌러야 보임 */}
         {showMore && (
           <>
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+              <span className="text-cyan-400 font-bold text-xs bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-900 min-w-[56px] text-center">FN</span>
+              <a href="https://www.fnnews.com/section/001002000" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">파이낸셜뉴스 국제경제</a>
+            </li>
+            <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
+              <span className="text-rose-400 font-bold text-xs bg-rose-950/50 px-2 py-0.5 rounded border border-rose-900 min-w-[56px] text-center">MT</span>
+              <a href="https://www.mt.co.kr/world" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">머니투데이 월드</a>
+            </li>
             <li className="flex gap-4 items-center border-b border-gray-900 pb-3">
               <span className="text-orange-400 font-bold text-xs bg-orange-950/50 px-2 py-0.5 rounded border border-orange-900 min-w-[56px] text-center">Chosun</span>
               <a href="https://biz.chosun.com/international" target="_blank" rel="noreferrer" className="text-gray-200 hover:text-white hover:underline transition text-base md:text-lg font-bold truncate">조선비즈 인터내셔널</a>
@@ -153,7 +148,7 @@ function QuickLinksSection() {
         onClick={() => setShowMore((prev) => !prev)}
         className="mt-4 text-xs font-bold text-gray-400 hover:text-white transition"
       >
-        {showMore ? '해외주식 기사 사이트 접기 ▴' : '해외주식 기사 사이트 더보기 (+3) ▾'}
+        {showMore ? '해외주식 기사 사이트 접기 ▴' : '해외주식 기사 사이트 더보기 (+5) ▾'}
       </button>
     </section>
   );
@@ -283,12 +278,16 @@ export default function Home() {
           <Link href="/journal" className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-2.5 rounded-full font-bold text-xs md:text-sm hover:opacity-90 transition shadow-md flex items-center gap-1">
             📝 100배주 →
           </Link>
+          <Link href="/calendar" className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-5 py-2.5 rounded-full font-bold text-xs md:text-sm hover:opacity-90 transition shadow-md flex items-center gap-1">
+            📅 일정 →
+          </Link>
           <AuthButton />
         </div>
       </header>
       
       <main className="max-w-7xl mx-auto">
         <StockTicker />
+        <UpcomingEvents />
         <QuickLinksSection />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

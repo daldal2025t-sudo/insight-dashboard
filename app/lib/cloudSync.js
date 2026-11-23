@@ -13,6 +13,8 @@ export const SYNC_KEYS = [
   'kijay_tab_configurations', // ETF투자: 탭별 보유/모델 구성
   'kijay_etf_counts_v2',      // ETF투자: 보유 수량
   'kijay_custom_etfs',        // ETF투자: 직접 추가한 티커
+  'kijay_calendar_events',    // 달력: 내가 추가한 일정
+  'kijay_calendar_hidden',    // 달력: 내가 숨긴(삭제한) 자동 일정 id
 ];
 const SYNCED_FLAG = 'kijay_cloud_synced_uid'; // 이 기기에서 해당 계정과 첫 병합을 끝냈는지 표시
 
@@ -55,8 +57,12 @@ function mergeFirst(key, localStr, cloudStr) {
     const ids = new Set(cloud.map((e) => e && e.id));
     return JSON.stringify([...cloud, ...local.filter((e) => e && !ids.has(e.id))]);
   }
-  if (key === 'kijay_custom_etfs' && Array.isArray(local) && Array.isArray(cloud)) {
+  if ((key === 'kijay_custom_etfs' || key === 'kijay_calendar_hidden') && Array.isArray(local) && Array.isArray(cloud)) {
     return JSON.stringify([...new Set([...cloud, ...local])]);
+  }
+  if (key === 'kijay_calendar_events' && Array.isArray(local) && Array.isArray(cloud)) {
+    const ids = new Set(cloud.map((e) => e && e.id));
+    return JSON.stringify([...cloud, ...local.filter((e) => e && !ids.has(e.id))]);
   }
   if (key === 'kijay_screener_results' && typeof local === 'object' && typeof cloud === 'object') {
     const merged = { ...cloud };
