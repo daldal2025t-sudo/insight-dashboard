@@ -64,6 +64,7 @@ export const TYPE_META = {
   fomc: { label: 'FOMC', chip: 'bg-red-100 text-red-700 border-red-200', dot: 'bg-red-500' },
   cpi: { label: 'CPI', chip: 'bg-orange-100 text-orange-700 border-orange-200', dot: 'bg-orange-500' },
   jobs: { label: '고용', chip: 'bg-sky-100 text-sky-700 border-sky-200', dot: 'bg-sky-500' },
+  pce: { label: 'PCE', chip: 'bg-teal-100 text-teal-700 border-teal-200', dot: 'bg-teal-500' },
   opex: { label: '옵션만기', chip: 'bg-slate-200 text-slate-700 border-slate-300', dot: 'bg-slate-500' },
   earn: { label: '실적', chip: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
   mine: { label: '내 종목', chip: 'bg-amber-200 text-amber-900 border-amber-400 ring-1 ring-amber-400', dot: 'bg-amber-500' },
@@ -94,6 +95,24 @@ const JOBS_DATES = [
   '2027-06-04', '2027-07-02', '2027-08-06', '2027-09-03', '2027-10-08', '2027-11-05', '2027-12-03',
 ];
 
+// PCE(개인소득·지출 보고서) — 미국 BEA 공식 일정(2026-11-24 갱신 기준). GDP 발표일이 모두 같은 날이라 함께 표시.
+const PCE_DATES = [
+  ['2026-11-25', 'GDP 2차 추정(3분기)'],
+  ['2026-12-23', 'GDP 3차 추정(3분기)'],
+  ['2027-01-28', 'GDP 속보치(4분기)'],
+  ['2027-02-25', 'GDP 2차 추정(4분기)'],
+  ['2027-03-31', 'GDP 3차 추정(4분기)'],
+  ['2027-04-29', 'GDP 속보치(1분기)'],
+  ['2027-05-27', 'GDP 2차 추정(1분기)'],
+  ['2027-06-25', 'GDP 3차 추정(1분기)'],
+  ['2027-07-29', 'GDP 속보치(2분기)'],
+  ['2027-08-25', 'GDP 2차 추정(2분기)'],
+  ['2027-09-30', 'GDP 3차 추정(2분기)'],
+  ['2027-10-28', 'GDP 속보치(3분기)'],
+  ['2027-11-24', 'GDP 2차 추정(3분기)'],
+  ['2027-12-22', 'GDP 3차 추정(3분기)'],
+];
+
 // 매월 셋째 금요일 = 옵션 만기일 (3·6·9·12월은 선물·옵션 동시만기 "네마녀의 날")
 // 금요일이 휴장이면 그 전날(목요일)로 당겨짐: 2027-06-18(준틴스 대체휴일)
 const OPEX_HOLIDAY_SHIFT = { '2027-06-18': '2027-06-17' };
@@ -110,6 +129,7 @@ function buildEconEvents() {
   FOMC.forEach(([date, title]) => list.push({ id: `fomc-${date}`, date, type: 'fomc', title, sub: '오후 2시(ET) · 한국시간 새벽 3~4시' }));
   CPI_DATES.forEach((date) => list.push({ id: `cpi-${date}`, date, type: 'cpi', title: 'CPI 소비자물가', sub: '오전 8:30(ET)' }));
   JOBS_DATES.forEach((date) => list.push({ id: `jobs-${date}`, date, type: 'jobs', title: '고용보고서', sub: '오전 8:30(ET)' }));
+  PCE_DATES.forEach(([date, gdp]) => list.push({ id: `pce-${date}`, date, type: 'pce', title: 'PCE 개인소비지출 물가', sub: `오전 8:30(ET) · ${gdp} 동시 발표` }));
   for (let y = 2026; y <= 2027; y += 1) {
     for (let m = 1; m <= 12; m += 1) {
       if (y === 2026 && m < 11) continue;

@@ -12,12 +12,13 @@ const USER_EVENTS_KEY = 'kijay_calendar_events';
 const HIDDEN_KEY = 'kijay_calendar_hidden';
 const BASE_SYMBOLS = EARNINGS_TICKERS.map((t) => t.symbol);
 const WEEK_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
-const ECON_TYPES = ['fomc', 'cpi', 'jobs', 'opex'];
+const ECON_TYPES = ['fomc', 'cpi', 'jobs', 'pce', 'opex'];
 
 function chipLabel(ev) {
   if (ev.type === 'fomc') return 'FOMC';
   if (ev.type === 'cpi') return 'CPI';
   if (ev.type === 'jobs') return '고용';
+  if (ev.type === 'pce') return 'PCE';
   if (ev.type === 'opex') return ev.title.startsWith('네마녀') ? '네마녀' : '옵션만기';
   if (ev.type === 'user') return ev.title;
   return ev.symbol;
