@@ -65,6 +65,8 @@ export const TYPE_META = {
   cpi: { label: 'CPI', chip: 'bg-orange-100 text-orange-700 border-orange-200', dot: 'bg-orange-500' },
   jobs: { label: '고용', chip: 'bg-sky-100 text-sky-700 border-sky-200', dot: 'bg-sky-500' },
   pce: { label: 'PCE', chip: 'bg-teal-100 text-teal-700 border-teal-200', dot: 'bg-teal-500' },
+  holiday: { label: '휴장', chip: 'bg-rose-500 text-white border-rose-600', dot: 'bg-rose-600' },
+  early: { label: '단축장', chip: 'bg-yellow-100 text-yellow-800 border-yellow-300', dot: 'bg-yellow-500' },
   opex: { label: '옵션만기', chip: 'bg-slate-200 text-slate-700 border-slate-300', dot: 'bg-slate-500' },
   earn: { label: '실적', chip: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
   mine: { label: '내 종목', chip: 'bg-amber-200 text-amber-900 border-amber-400 ring-1 ring-amber-400', dot: 'bg-amber-500' },
@@ -113,6 +115,26 @@ const PCE_DATES = [
   ['2027-12-22', 'GDP 3차 추정(3분기)'],
 ];
 
+// 미국 증시(NYSE·나스닥) 휴장일 / 조기 마감일 — NYSE 공식 "Holidays & Trading Hours" 기준(2026·2027·2028년 공시).
+// 'closed' = 휴장, 'early' = 오후 1시(ET) 조기 마감. 2027-07-05·06-18·12-24는 공휴일이 토·일요일이라 대체 휴장.
+const MARKET_HOLIDAYS = [
+  ['2026-11-26', '추수감사절', 'closed'],
+  ['2026-11-27', '추수감사절 다음 날', 'early'],
+  ['2026-12-24', '크리스마스 이브', 'early'],
+  ['2026-12-25', '크리스마스', 'closed'],
+  ['2027-01-01', '새해 첫날', 'closed'],
+  ['2027-01-18', '마틴 루터 킹 데이', 'closed'],
+  ['2027-02-15', '대통령의 날(워싱턴 탄생일)', 'closed'],
+  ['2027-03-26', '성금요일', 'closed'],
+  ['2027-05-31', '메모리얼 데이', 'closed'],
+  ['2027-06-18', '준틴스(대체 휴장)', 'closed'],
+  ['2027-07-05', '독립기념일(대체 휴장)', 'closed'],
+  ['2027-09-06', '노동절', 'closed'],
+  ['2027-11-25', '추수감사절', 'closed'],
+  ['2027-11-26', '추수감사절 다음 날', 'early'],
+  ['2027-12-24', '크리스마스(대체 휴장)', 'closed'],
+];
+
 // 매월 셋째 금요일 = 옵션 만기일 (3·6·9·12월은 선물·옵션 동시만기 "네마녀의 날")
 // 금요일이 휴장이면 그 전날(목요일)로 당겨짐: 2027-06-18(준틴스 대체휴일)
 const OPEX_HOLIDAY_SHIFT = { '2027-06-18': '2027-06-17' };
@@ -130,6 +152,13 @@ function buildEconEvents() {
   CPI_DATES.forEach((date) => list.push({ id: `cpi-${date}`, date, type: 'cpi', title: 'CPI 소비자물가', sub: '오전 8:30(ET)' }));
   JOBS_DATES.forEach((date) => list.push({ id: `jobs-${date}`, date, type: 'jobs', title: '고용보고서', sub: '오전 8:30(ET)' }));
   PCE_DATES.forEach(([date, gdp]) => list.push({ id: `pce-${date}`, date, type: 'pce', title: 'PCE 개인소비지출 물가', sub: `오전 8:30(ET) · ${gdp} 동시 발표` }));
+  MARKET_HOLIDAYS.forEach(([date, name, kind]) => {
+    if (kind === 'closed') {
+      list.push({ id: `holiday-${date}`, date, type: 'holiday', title: `${name} · 미국 증시 휴장`, sub: '한국시간으로는 그날 밤~다음 날 새벽 장이 열리지 않아요' });
+    } else {
+      list.push({ id: `early-${date}`, date, type: 'early', title: `${name} · 미국 증시 조기 마감`, sub: '오후 1시(ET) 마감 · 한국시간 새벽 3시' });
+    }
+  });
   for (let y = 2026; y <= 2027; y += 1) {
     for (let m = 1; m <= 12; m += 1) {
       if (y === 2026 && m < 11) continue;
@@ -243,7 +272,7 @@ export function buildEvents({ earnings = [], userEvents = [], myTickers = [], hi
     .map((ev) => ({ ...ev, hidden: hidden.has(ev.id) }))
     .filter((ev) => includeHidden || !ev.hidden);
 
-  const rank = (t) => (t === 'mine' ? 0 : t === 'user' ? 1 : t === 'fomc' ? 2 : 3);
+  const rank = (t) => (t === 'holiday' || t === 'early' ? -1 : t === 'mine' ? 0 : t === 'user' ? 1 : t === 'fomc' ? 2 : 3);
   out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : rank(a.type) - rank(b.type)));
   return out;
 }

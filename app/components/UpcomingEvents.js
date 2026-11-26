@@ -15,6 +15,8 @@ function chipText(ev) {
   if (ev.type === 'cpi') return 'CPI';
   if (ev.type === 'jobs') return '고용보고서';
   if (ev.type === 'pce') return 'PCE·GDP';
+  if (ev.type === 'holiday') return '미국 증시 휴장';
+  if (ev.type === 'early') return '미국 증시 단축장';
   if (ev.type === 'opex') return ev.title.startsWith('네마녀') ? '네마녀의 날' : '옵션만기';
   if (ev.type === 'user') return ev.title;
   return `${ev.symbol} 실적`;

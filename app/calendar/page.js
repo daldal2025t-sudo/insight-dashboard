@@ -19,6 +19,8 @@ function chipLabel(ev) {
   if (ev.type === 'cpi') return 'CPI';
   if (ev.type === 'jobs') return '고용';
   if (ev.type === 'pce') return 'PCE';
+  if (ev.type === 'holiday') return '휴장';
+  if (ev.type === 'early') return '단축장';
   if (ev.type === 'opex') return ev.title.startsWith('네마녀') ? '네마녀' : '옵션만기';
   if (ev.type === 'user') return ev.title;
   return ev.symbol;
@@ -211,6 +213,7 @@ export default function CalendarPage() {
               const events = byDate[iso] || [];
               const isToday = iso === today;
               const isSelected = iso === selected;
+              const isClosed = events.some((ev) => ev.type === 'holiday');
               const col = idx % 7;
               const shown = events.slice(0, 3);
               const rest = events.length - shown.length;
@@ -218,7 +221,7 @@ export default function CalendarPage() {
                 <button
                   key={iso}
                   onClick={() => setSelected(iso)}
-                  className={`min-h-[72px] md:min-h-[108px] p-1 md:p-1.5 border-b border-r border-gray-100 text-left align-top flex flex-col gap-0.5 transition hover:bg-blue-50/40 ${isSelected ? 'bg-blue-50 ring-2 ring-inset ring-blue-400' : ''}`}
+                  className={`min-h-[72px] md:min-h-[108px] p-1 md:p-1.5 border-b border-r border-gray-100 text-left align-top flex flex-col gap-0.5 transition hover:bg-blue-50/40 ${isSelected ? 'bg-blue-50 ring-2 ring-inset ring-blue-400' : isClosed ? 'bg-rose-50' : ''}`}
                 >
                   <span className={`text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white' : col === 0 ? 'text-red-500' : col === 6 ? 'text-blue-500' : 'text-gray-700'}`}>
                     {+iso.slice(8, 10)}
