@@ -97,6 +97,8 @@ export async function GET(request) {
   let query = searchParams.get('query') || '경제';
   // '더보기' 지원: 요청한 개수만큼(기본 10개, 최대 20개) 가져옵니다.
   const displayCount = Math.min(Math.max(parseInt(searchParams.get('display'), 10) || 10, 1), 20);
+  // 정렬: 기본은 관련도순(sim). 달력의 "실적 기사 보기"처럼 최신 기사가 필요하면 sort=date.
+  const sortMode = searchParams.get('sort') === 'date' ? 'date' : 'sim';
 
   if (query === '해외증시') {
     const { newsList, notes } = await fetchOverseasMarketNews(displayCount);
@@ -127,7 +129,7 @@ export async function GET(request) {
   }
 
   try {
-    const response = await fetch(`https://openapi.naver.com/v1/search/news.json?query=${encodeURI(query)}&display=${displayCount}&sort=sim`, {
+    const response = await fetch(`https://openapi.naver.com/v1/search/news.json?query=${encodeURI(query)}&display=${displayCount}&sort=${sortMode}`, {
       headers: {
         'X-Naver-Client-Id': clientId,
         'X-Naver-Client-Secret': clientSecret,

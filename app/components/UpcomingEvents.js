@@ -8,7 +8,9 @@ import {
 
 const BASE_SYMBOLS = EARNINGS_TICKERS.map((t) => t.symbol);
 const DAYS_AHEAD = 14;
+const CLOSURE_DAYS_AHEAD = 45; // 증시 휴장·단축일은 더 멀리 미리 알려줌
 const MAX_CHIPS = 14;
+const isClosure = (ev) => ev.type === 'holiday' || ev.type === 'early';
 
 function chipText(ev) {
   if (ev.type === 'fomc') return 'FOMC';
@@ -51,21 +53,27 @@ export default function UpcomingEvents() {
     return () => { cancelled = true; };
   }, [extraKey]);
 
-  const upcoming = useMemo(() => {
-    return buildEvents({ earnings, userEvents, myTickers, hiddenIds })
-      .filter((ev) => {
-        const d = diffDays(today, ev.date);
-        return d >= 0 && d <= DAYS_AHEAD;
-      });
+  // 일반 일정은 앞으로 2주, 휴장·단축일은 45일 앞까지. 휴장·단축일은 칩 개수 제한에 걸려 잘리지 않게 따로 합친다.
+  const { shown, rest } = useMemo(() => {
+    const all = buildEvents({ earnings, userEvents, myTickers, hiddenIds });
+    const regular = all.filter((ev) => {
+      if (isClosure(ev)) return false;
+      const d = diffDays(today, ev.date);
+      return d >= 0 && d <= DAYS_AHEAD;
+    });
+    const closures = all.filter((ev) => {
+      if (!isClosure(ev)) return false;
+      const d = diffDays(today, ev.date);
+      return d >= 0 && d <= CLOSURE_DAYS_AHEAD;
+    });
+    const merged = [...regular.slice(0, MAX_CHIPS), ...closures].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    return { shown: merged, rest: Math.max(regular.length - MAX_CHIPS, 0) };
   }, [earnings, userEvents, myTickers, hiddenIds, today]);
-
-  const shown = upcoming.slice(0, MAX_CHIPS);
-  const rest = upcoming.length - shown.length;
 
   return (
     <section className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-gray-200 mb-6">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm md:text-base font-extrabold text-gray-900">📅 다가오는 일정 <span className="text-xs font-bold text-gray-400">(앞으로 2주)</span></h2>
+        <h2 className="text-sm md:text-base font-extrabold text-gray-900">📅 다가오는 일정 <span className="text-xs font-bold text-gray-400">(앞으로 2주 · 증시 휴장/단축일은 45일 앞까지)</span></h2>
         <Link href="/calendar" className="text-xs md:text-sm font-bold text-blue-600 hover:underline">달력 보기 →</Link>
       </div>
       {shown.length === 0 ? (
@@ -75,7 +83,7 @@ export default function UpcomingEvents() {
           {shown.map((ev) => (
             <Link
               key={ev.id}
-              href="/calendar"
+              href={`/calendar?date=${ev.date}`}
               className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold hover:opacity-80 transition ${TYPE_META[ev.type].chip} ${ev.estimated ? 'border-dashed' : ''}`}
               title={[ev.title, ev.sub].filter(Boolean).join(' · ')}
             >

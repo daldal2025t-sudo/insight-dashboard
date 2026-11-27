@@ -34,6 +34,78 @@ function kstHint(ev) {
   return '';
 }
 
+function cleanText(s) {
+  return String(s || '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;|&apos;/g, "'");
+}
+
+function formatPubDate(pub) {
+  const d = new Date(pub);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' });
+}
+
+// 실적 발표 일정을 눌렀을 때: 관련 기사(네이버 뉴스 최신순)를 바로 보여주고, 외부 검색 링크도 함께 제공
+function EarningsNews({ ev, today }) {
+  const [state, setState] = useState({ status: 'idle', items: [], message: '' });
+  const name = ev.name || ev.symbol;
+  const sym = ev.symbol;
+  const naverUrl = `https://search.naver.com/search.naver?where=news&sort=1&query=${encodeURIComponent(`${name} 실적`)}`;
+  const googleUrl = `https://www.google.com/search?tbm=nws&q=${encodeURIComponent(`${sym} earnings results`)}`;
+  const saUrl = `https://stockanalysis.com/stocks/${encodeURIComponent(sym.toLowerCase())}/financials/?p=quarterly`;
+  const notYet = ev.date > today;
+
+  const loadNews = () => {
+    setState({ status: 'loading', items: [], message: '' });
+    fetch(`/api/news?query=${encodeURIComponent(`${name} 실적`)}&display=5&sort=date`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setState({ status: 'done', items: data, message: '' });
+        else setState({ status: 'error', items: [], message: (data && data.error) || '기사를 불러오지 못했어요.' });
+      })
+      .catch(() => setState({ status: 'error', items: [], message: '기사를 불러오지 못했어요.' }));
+  };
+
+  const linkCls = 'rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-bold text-gray-600 hover:bg-gray-50';
+
+  return (
+    <div className="mt-2 flex flex-col gap-2">
+      {notYet ? (
+        <p className="text-[11px] text-gray-400">아직 발표 전이에요. 발표 후에 실적 기사를 볼 수 있어요.</p>
+      ) : ev.date === today ? (
+        <p className="text-[11px] text-gray-400">오늘(미국 기준) 발표 일정이에요. 한국시간으로는 보통 다음 날 새벽에 나와 기사가 아직 없을 수 있어요.</p>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {!notYet && (
+          <button onClick={loadNews} disabled={state.status === 'loading'} className="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-60">
+            {state.status === 'loading' ? '불러오는 중…' : '📰 실적 기사 보기'}
+          </button>
+        )}
+        <a href={naverUrl} target="_blank" rel="noreferrer" className={linkCls}>네이버 뉴스 ↗</a>
+        <a href={googleUrl} target="_blank" rel="noreferrer" className={linkCls}>구글 뉴스(영문) ↗</a>
+        <a href={saUrl} target="_blank" rel="noreferrer" className={linkCls}>분기 실적표 ↗</a>
+      </div>
+      {state.status === 'error' && <p className="text-[11px] text-red-500">{state.message}</p>}
+      {state.status === 'done' && state.items.length === 0 && <p className="text-[11px] text-gray-400">관련 기사를 찾지 못했어요. 위 검색 링크를 이용해 보세요.</p>}
+      {state.status === 'done' && state.items.length > 0 && (
+        <ul className="flex flex-col gap-1 rounded-lg bg-gray-50 p-2">
+          {state.items.map((item, i) => (
+            <li key={`${item.link}-${i}`} className="flex gap-2 text-xs">
+              <span className="shrink-0 text-gray-400">{formatPubDate(item.pubDate)}</span>
+              <a href={item.link} target="_blank" rel="noreferrer" className="font-medium text-gray-800 hover:underline break-words">{cleanText(item.title)}</a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function CalendarPage() {
   const initialToday = todayKst();
   const [today] = useState(initialToday);
@@ -63,6 +135,17 @@ export default function CalendarPage() {
     Promise.resolve().then(load);
     window.addEventListener('cloud-sync-complete', load);
     return () => window.removeEventListener('cloud-sync-complete', load);
+  }, []);
+
+  // 메인 화면 "다가오는 일정"에서 누르면 /calendar?date=YYYY-MM-DD 로 와서 그 날짜를 바로 열어줌
+  useEffect(() => {
+    const date = new URLSearchParams(window.location.search).get('date');
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      Promise.resolve().then(() => {
+        setSelected(date);
+        setYm({ y: +date.slice(0, 4), m: +date.slice(5, 7) });
+      });
+    }
   }, []);
 
   // 매매일지/스크리너에만 있고 기본 50종목에 없는 티커는 따로 실적일을 조회
@@ -270,6 +353,7 @@ export default function CalendarPage() {
                     {(ev.sub || kstHint(ev)) && (
                       <p className="text-xs text-gray-500 break-words">{[ev.sub, kstHint(ev)].filter(Boolean).join(' · ')}</p>
                     )}
+                    {(ev.type === 'earn' || ev.type === 'mine') && <EarningsNews ev={ev} today={today} />}
                   </div>
                   <button onClick={() => removeEvent(ev)} className="shrink-0 text-xs font-bold text-gray-400 hover:text-red-600">
                     {ev.type === 'user' ? '삭제' : '숨기기'}
